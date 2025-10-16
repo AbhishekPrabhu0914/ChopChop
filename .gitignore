@@ -1,2 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+venv/
 .env
-/venv
+*.log
+
+# Node.js / Next.js
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific test files
+backend/IMG_3391.png
+backend/test_image.py
+backend/test_small.jpg
