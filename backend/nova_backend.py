@@ -120,20 +120,51 @@ def generate_recipes_from_fridge(message, image_bytes, image_format):
     client = get_bedrock_client()
     model_id = "amazon.nova-pro-v1:0"
     
-    # Prepare specialized prompt for fridge analysis
-    fridge_prompt = """You are a professional chef and food expert. Analyze this fridge photo and:
+    # Prepare specialized prompt for fridge analysis with structured output
+    fridge_prompt = """You are a professional chef and food expert. Analyze this fridge photo and return a JSON response with the following structure:
 
-1. First, identify and list all the ingredients/foods you can clearly see
-2. Then suggest 2-3 creative recipes that can be made using these ingredients
-3. For each recipe, provide:
-   - Recipe name
-   - Brief description
-   - List of ingredients needed (from what's visible)
-   - Step-by-step cooking instructions
-   - Estimated cooking time
-   - Difficulty level (Easy/Medium/Hard)
+{
+  "ingredients": [
+    {
+      "name": "ingredient name",
+      "quantity": "estimated amount",
+      "category": "dairy/vegetables/meat/etc",
+      "freshness": "fresh/good/needs_use_soon/expired"
+    }
+  ],
+  "grocery_list": [
+    {
+      "item": "item name",
+      "category": "category",
+      "needed_for": "recipe name or general use",
+      "priority": "high/medium/low",
+      "checked": false
+    }
+  ],
+  "recipes": [
+    {
+      "name": "Recipe Name",
+      "description": "Brief description",
+      "cooking_time": "X minutes",
+      "difficulty": "Easy/Medium/Hard",
+      "servings": "X servings",
+      "ingredients_needed": [
+        {
+          "name": "ingredient",
+          "amount": "quantity",
+          "available": true/false
+        }
+      ],
+      "instructions": [
+        "Step 1: ...",
+        "Step 2: ..."
+      ],
+      "tips": "Additional cooking tips"
+    }
+  ]
+}
 
-Be specific about quantities and cooking techniques. If you see common ingredients like eggs, milk, vegetables, etc., suggest practical everyday recipes that a home cook can easily make."""
+Analyze the fridge photo and provide this structured response. Be specific about quantities and cooking techniques."""
     
     # Prepare the content
     content = [
@@ -162,15 +193,40 @@ Be specific about quantities and cooking techniques. If you see common ingredien
             modelId=model_id,
             messages=conversation,
             inferenceConfig={
-                "maxTokens": 1024,  # Increased for detailed recipes
-                "temperature": 0.7,  # Slightly higher for creativity
+                "maxTokens": 2048,  # Increased for detailed structured output
+                "temperature": 0.3,  # Lower for more consistent JSON
                 "topP": 0.9
             },
         )
         
-        # Extract and return the response text
+        # Extract and parse the response text
         response_text = response["output"]["message"]["content"][0]["text"]
-        return response_text
+        
+        # Try to parse as JSON, fallback to text if parsing fails
+        try:
+            import json
+            # Look for JSON in the response (sometimes Nova adds extra text)
+            json_start = response_text.find('{')
+            json_end = response_text.rfind('}') + 1
+            if json_start != -1 and json_end > json_start:
+                json_str = response_text[json_start:json_end]
+                parsed_data = json.loads(json_str)
+                return {
+                    "type": "structured",
+                    "data": parsed_data
+                }
+            else:
+                # Fallback to text response
+                return {
+                    "type": "text",
+                    "data": response_text
+                }
+        except (json.JSONDecodeError, ValueError) as e:
+            logger.warning(f"Failed to parse JSON response: {e}")
+            return {
+                "type": "text", 
+                "data": response_text
+            }
         
     except ClientError as e:
         logger.error(f"AWS Client Error: {e}")

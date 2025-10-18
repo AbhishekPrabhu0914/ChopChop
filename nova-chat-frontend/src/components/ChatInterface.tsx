@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import GroceryList from './GroceryList';
+import Recipes from './Recipes';
 
 interface Message {
   id: string;
@@ -9,6 +11,30 @@ interface Message {
   timestamp: Date;
   hasImage?: boolean;
   imageUrl?: string;
+  structuredData?: any;
+}
+
+interface GroceryItem {
+  item: string;
+  category: string;
+  needed_for: string;
+  priority: 'high' | 'medium' | 'low';
+  checked: boolean;
+}
+
+interface Recipe {
+  name: string;
+  description: string;
+  cooking_time: string;
+  difficulty: 'Easy' | 'Medium' | 'Hard';
+  servings: string;
+  ingredients_needed: Array<{
+    name: string;
+    amount: string;
+    available: boolean;
+  }>;
+  instructions: string[];
+  tips: string;
 }
 
 export default function ChatInterface() {
@@ -19,6 +45,9 @@ export default function ChatInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'chat' | 'grocery' | 'recipes'>('chat');
+  const [groceryItems, setGroceryItems] = useState<GroceryItem[]>([]);
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -151,13 +180,39 @@ export default function ChatInterface() {
       const data = await response.json();
 
       if (data.success) {
-        const novaMessage: Message = {
-          id: `nova-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          text: data.response,
-          sender: 'nova',
-          timestamp: new Date()
-        };
-        setMessages(prev => [...prev, novaMessage]);
+        // Check if response is structured data
+        if (data.response && typeof data.response === 'object' && data.response.type === 'structured') {
+          const structuredData = data.response.data;
+          
+          // Update grocery list and recipes
+          if (structuredData.grocery_list) {
+            setGroceryItems(structuredData.grocery_list);
+          }
+          if (structuredData.recipes) {
+            setRecipes(structuredData.recipes);
+          }
+          
+          // Switch to grocery tab if we have structured data
+          setActiveTab('grocery');
+          
+          const novaMessage: Message = {
+            id: `nova-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            text: `I've analyzed your fridge! I found ${structuredData.ingredients?.length || 0} ingredients and created ${structuredData.recipes?.length || 0} recipes for you. Check out the Grocery List and Recipes tabs!`,
+            sender: 'nova',
+            timestamp: new Date(),
+            structuredData: structuredData
+          };
+          setMessages(prev => [...prev, novaMessage]);
+        } else {
+          // Regular text response
+          const novaMessage: Message = {
+            id: `nova-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            text: data.response,
+            sender: 'nova',
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, novaMessage]);
+        }
       } else {
         console.error('Backend error:', data);
         throw new Error(data.error || 'Failed to get response');
@@ -308,9 +363,42 @@ export default function ChatInterface() {
         </div>
       </div>
 
-      {/* Messages */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {messages.map((message) => (
+      {/* Tab Navigation */}
+      <div style={{ backgroundColor: 'white', borderBottom: '1px solid #e5e7eb' }}>
+        <div style={{ display: 'flex', padding: '0 1rem' }}>
+          {[
+            { id: 'chat', label: '💬 Chat', icon: '💬' },
+            { id: 'grocery', label: '🛒 Grocery List', icon: '🛒' },
+            { id: 'recipes', label: '👨‍🍳 Recipes', icon: '👨‍🍳' }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              style={{
+                backgroundColor: activeTab === tab.id ? '#3b82f6' : 'transparent',
+                color: activeTab === tab.id ? 'white' : '#6b7280',
+                border: 'none',
+                padding: '0.75rem 1rem',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                cursor: 'pointer',
+                borderBottom: activeTab === tab.id ? '2px solid #3b82f6' : '2px solid transparent',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              {tab.icon} {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Tab Content */}
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+        {activeTab === 'chat' && (
+          <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {messages.map((message) => (
           <div
             key={message.id}
             style={{ display: 'flex', justifyContent: message.sender === 'user' ? 'flex-end' : 'flex-start' }}
@@ -362,11 +450,24 @@ export default function ChatInterface() {
           </div>
         )}
         
-        <div ref={messagesEndRef} />
+            <div ref={messagesEndRef} />
+          </div>
+        )}
+
+        {activeTab === 'grocery' && (
+          <GroceryList 
+            initialItems={groceryItems} 
+            onUpdate={setGroceryItems} 
+          />
+        )}
+
+        {activeTab === 'recipes' && (
+          <Recipes recipes={recipes} />
+        )}
       </div>
 
-      {/* Image Preview */}
-      {imagePreview && (
+      {/* Image Preview - only show in chat tab */}
+      {activeTab === 'chat' && imagePreview && (
         <div style={{ padding: '0.5rem 1rem', backgroundColor: '#f3f4f6', borderTop: '1px solid #e5e7eb' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <img
@@ -388,8 +489,9 @@ export default function ChatInterface() {
         </div>
       )}
 
-      {/* Input */}
-      <div style={{ backgroundColor: 'white', borderTop: '1px solid #e5e7eb', padding: '1rem' }}>
+      {/* Input - only show in chat tab */}
+      {activeTab === 'chat' && (
+        <div style={{ backgroundColor: 'white', borderTop: '1px solid #e5e7eb', padding: '1rem' }}>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
             <input
               type="file"
@@ -443,7 +545,8 @@ export default function ChatInterface() {
             {isLoading ? '⏳' : '📤'}
           </button>
         </div>
-      </div>
+        </div>
+      )}
 
       <style jsx>{`
         @keyframes spin {
