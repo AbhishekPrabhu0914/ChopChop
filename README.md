@@ -14,9 +14,13 @@ Frontend (Next.js) → Backend API → Python Flask → AWS Bedrock Nova Lite
 
 ## Features
 
-- 💬 Real-time chat interface with Nova Lite
-- 🖼️ Image upload and analysis
-- 📱 Responsive design
+- 💬 Real-time chat interface with Nova Pro
+- 🖼️ Image upload and analysis with structured output
+- 🛒 Interactive grocery list management
+- 👨‍🍳 Recipe browsing and detailed views
+- 📧 Email integration for sharing lists and recipes
+- 💾 Data persistence with Supabase
+- 📱 Responsive design with tabbed interface
 - ⚡ Fast and modern UI
 - 🔒 Secure backend API integration
 - 🐍 Python backend with AWS Bedrock integration
@@ -53,6 +57,7 @@ Frontend (Next.js) → Backend API → Python Flask → AWS Bedrock Nova Lite
 - Python 3.11+
 - Node.js 18+
 - AWS Account with Bedrock access
+- Supabase Account (for data persistence and email)
 
 ### Backend Setup (Python)
 
@@ -61,13 +66,23 @@ Frontend (Next.js) → Backend API → Python Flask → AWS Bedrock Nova Lite
    pip install -r requirements.txt
    ```
 
-2. **Configure AWS credentials**:
+2. **Configure Supabase** (Required):
+   - Follow the instructions in `SUPABASE_SETUP.md`
+   - Create a `.env` file in the `backend/` directory with your Supabase credentials
+
+3. **Configure AWS credentials**:
    ```bash
    aws configure
    # OR set environment variables:
    export AWS_REGION=us-east-1
    export AWS_ACCESS_KEY_ID=your_key
    export AWS_SECRET_ACCESS_KEY=your_secret
+   ```
+
+4. **Test Supabase integration**:
+   ```bash
+   cd backend
+   python test_supabase.py
    ```
 
 ### Frontend Setup (Next.js)
@@ -78,26 +93,36 @@ Frontend (Next.js) → Backend API → Python Flask → AWS Bedrock Nova Lite
    npm install
    ```
 
-2. **Configure backend URL** (optional):
+2. **Configure Supabase** (Required):
+   Create a `.env.local` file in the `nova-chat-frontend/` directory:
    ```bash
-   # Create .env.local
-   echo "PYTHON_BACKEND_URL=http://localhost:8000" > .env.local
+   # Supabase Configuration
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
    ```
 
 ## Usage
 
 1. **Text Chat**: Type your message and press Enter
-2. **Image Analysis**: Click the 📷 button to upload an image, then ask questions about it
-3. **Multimodal**: Combine text and images in the same message
+2. **Fridge Photo Analysis**: Click "📸 Upload Fridge Photo" to analyze ingredients and generate recipes
+3. **Grocery List Management**: Switch to the "🛒 Grocery List" tab to manage your shopping list
+4. **Recipe Browsing**: Switch to the "👨‍🍳 Recipes" tab to view detailed recipes
+5. **Data Persistence**: Use "💾 Save Data" to save your lists and recipes
+6. **Email Sharing**: Use "📧 Send Email" to share your grocery list and recipes via email
 
 ## API Endpoints
 
 ### Backend (Python Flask)
 - `GET /health` - Health check
-- `POST /chat` - Send messages to Nova Lite model
+- `POST /chat` - Send messages to Nova Pro model
+- `POST /save-data` - Save user data to Supabase
+- `POST /get-data` - Retrieve user data from Supabase
+- `POST /update-data` - Update user data in Supabase
+- `POST /send-email` - Send email with grocery list and recipes
 
 ### Frontend (Next.js)
 - `POST /api/chat` - Proxy to Python backend
+- `POST /api/send-email` - Proxy for email sending
 
 ## Project Structure
 
@@ -105,18 +130,27 @@ Frontend (Next.js) → Backend API → Python Flask → AWS Bedrock Nova Lite
 Cairt/
 ├── backend/                    # Python backend
 │   ├── nova_backend.py        # Flask API server
-│   ├── nova_chat.py           # Original Nova chat script
-│   ├── nova_multimodal.py     # Enhanced Nova script
-│   ├── test.py                # Test script
-│   └── requirements.txt       # Python dependencies
+│   ├── supabase_config.py     # Supabase integration
+│   ├── test_supabase.py       # Supabase test script
+│   ├── requirements.txt       # Python dependencies
+│   └── .env                   # Environment variables
 ├── nova-chat-frontend/         # Next.js frontend
 │   ├── src/
 │   │   ├── app/
-│   │   │   ├── api/chat/route.ts    # Frontend API proxy
-│   │   │   └── page.tsx             # Main page
-│   │   └── components/
-│   │       └── ChatInterface.tsx   # Chat component
+│   │   │   ├── api/
+│   │   │   │   ├── chat/route.ts        # Chat API proxy
+│   │   │   │   └── send-email/route.ts  # Email API proxy
+│   │   │   └── page.tsx                 # Main page
+│   │   ├── components/
+│   │   │   ├── ChatInterface.tsx        # Main chat component
+│   │   │   ├── GroceryList.tsx          # Grocery list component
+│   │   │   └── Recipes.tsx              # Recipes component
+│   │   └── lib/
+│   │       └── supabase.ts              # Supabase client
+│   ├── .env.local             # Frontend environment variables
 │   └── package.json
+├── supabase_schema.sql        # Database schema
+├── SUPABASE_SETUP.md          # Supabase setup guide
 ├── start_chopchop.sh         # Startup script
 └── README.md                  # This file
 ```
@@ -124,25 +158,36 @@ Cairt/
 ## Environment Variables
 
 ### Backend (Python)
+- `SUPABASE_URL` - Supabase project URL (required)
+- `SUPABASE_ANON_KEY` - Supabase anonymous key (required)
+- `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key (required)
 - `AWS_REGION` - AWS region (default: us-east-1)
-- `AWS_ACCESS_KEY_ID` - AWS access key
-- `AWS_SECRET_ACCESS_KEY` - AWS secret key
+- `AWS_ACCESS_KEY_ID` - AWS access key (required)
+- `AWS_SECRET_ACCESS_KEY` - AWS secret key (required)
+- `SMTP_HOST` - Email SMTP host (optional, default: smtp.gmail.com)
+- `SMTP_PORT` - Email SMTP port (optional, default: 587)
+- `SMTP_USER` - Email username (optional)
+- `SMTP_PASSWORD` - Email password (optional)
 - `PORT` - Backend port (default: 8000)
 - `FLASK_DEBUG` - Debug mode (default: False)
 
 ### Frontend (Next.js)
-- `PYTHON_BACKEND_URL` - Backend URL (default: http://localhost:8000)
+- `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL (required)
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase anonymous key (required)
 
 ## AWS Permissions Required
 
 Your AWS credentials need the following permissions:
-- `bedrock:InvokeModel` for `amazon.nova-lite-v1:0`
+- `bedrock:InvokeModel` for `amazon.nova-pro-v1:0`
 - Access to Bedrock Runtime service
 
 ## Troubleshooting
 
-- **Backend not starting**: Check AWS credentials and permissions
+- **Backend not starting**: Check AWS credentials and Supabase configuration
 - **Frontend can't connect**: Verify backend is running on port 8000
+- **Supabase errors**: Run `python test_supabase.py` to diagnose issues
+- **Email not sending**: Check SMTP credentials and email configuration
+- **Data not saving**: Verify Supabase environment variables are set correctly
 - **CORS errors**: Backend has CORS enabled for localhost:3000
 - **Image upload issues**: Check image size limits and format support
 

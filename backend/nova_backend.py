@@ -13,6 +13,13 @@ from botocore.exceptions import ClientError
 import logging
 from PIL import Image
 import io
+from dotenv import load_dotenv
+from supabase_config import supabase_manager
+import uuid
+import time
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -20,6 +27,9 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend communication
+
+# Simple in-memory session store (in production, use Redis or database)
+user_sessions = {}
 
 # Configure AWS SDK
 def get_bedrock_client():
@@ -33,6 +43,29 @@ def get_bedrock_client():
     except Exception as e:
         logger.error(f"Failed to create Bedrock client: {e}")
         raise
+
+def create_user_session(email):
+    """Create a new user session"""
+    session_id = str(uuid.uuid4())
+    user_sessions[session_id] = {
+        'email': email,
+        'created_at': time.time(),
+        'last_activity': time.time()
+    }
+    return session_id
+
+def validate_session(session_id):
+    """Validate user session and return email if valid"""
+    if session_id in user_sessions:
+        session = user_sessions[session_id]
+        # Check if session is not expired (24 hours)
+        if time.time() - session['created_at'] < 86400:
+            session['last_activity'] = time.time()
+            return session['email']
+        else:
+            # Remove expired session
+            del user_sessions[session_id]
+    return None
 
 def preprocess_image(image_base64, max_size_mb=4, max_dimension=2048):
     """
@@ -300,6 +333,81 @@ def health_check():
     """Health check endpoint"""
     return jsonify({"status": "healthy", "service": "chopchop-backend"})
 
+@app.route("/auth/signin", methods=["POST"])
+def signin():
+    """Sign in with email"""
+    try:
+        data = request.get_json()
+        email = data.get('email', '').strip().lower()
+        
+        if not email:
+            return jsonify({"error": "Email is required"}), 400
+        
+        # Basic email validation
+        if '@' not in email or '.' not in email.split('@')[1]:
+            return jsonify({"error": "Invalid email format"}), 400
+        
+        # Create user session
+        session_id = create_user_session(email)
+        
+        logger.info(f"User signed in: {email}")
+        
+        return jsonify({
+            "success": True,
+            "message": "Signed in successfully",
+            "session_id": session_id,
+            "email": email
+        })
+        
+    except Exception as e:
+        logger.error(f"Sign in error: {e}")
+        return jsonify({"error": "Sign in failed"}), 500
+
+@app.route("/auth/verify", methods=["POST"])
+def verify_session():
+    """Verify user session"""
+    try:
+        data = request.get_json()
+        session_id = data.get('session_id', '')
+        
+        if not session_id:
+            return jsonify({"error": "Session ID is required"}), 400
+        
+        email = validate_session(session_id)
+        
+        if email:
+            return jsonify({
+                "success": True,
+                "email": email,
+                "message": "Session is valid"
+            })
+        else:
+            return jsonify({"error": "Invalid or expired session"}), 401
+            
+    except Exception as e:
+        logger.error(f"Session verification error: {e}")
+        return jsonify({"error": "Session verification failed"}), 500
+
+@app.route("/auth/signout", methods=["POST"])
+def signout():
+    """Sign out user"""
+    try:
+        data = request.get_json()
+        session_id = data.get('session_id', '')
+        
+        if session_id and session_id in user_sessions:
+            del user_sessions[session_id]
+            logger.info(f"User signed out: {session_id}")
+        
+        return jsonify({
+            "success": True,
+            "message": "Signed out successfully"
+        })
+        
+    except Exception as e:
+        logger.error(f"Sign out error: {e}")
+        return jsonify({"error": "Sign out failed"}), 500
+
 @app.route('/chat', methods=['POST'])
 def chat():
     """Main chat endpoint"""
@@ -369,6 +477,173 @@ def chat():
             "details": str(e)
         }), 500
 
+@app.route('/save-data', methods=['POST'])
+def save_data():
+    """Save user's grocery items and recipes to Supabase"""
+    try:
+        if not supabase_manager.enabled:
+            return jsonify({
+                "success": False,
+                "error": "Supabase is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables."
+            }), 503
+        
+        data = request.get_json()
+        session_id = data.get('session_id')
+        items = data.get('items', [])
+        recipes = data.get('recipes', [])
+        
+        # Verify session
+        user_email = validate_session(session_id)
+        if not user_email:
+            return jsonify({"error": "Invalid or expired session"}), 401
+        
+        record_id = supabase_manager.save_user_data(user_email, items, recipes)
+        
+        if record_id:
+            return jsonify({
+                "success": True,
+                "message": "Data saved successfully",
+                "record_id": record_id
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Failed to save data"
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error saving data: {e}")
+        return jsonify({
+            "success": False,
+            "error": "Failed to save data",
+            "details": str(e)
+        }), 500
+
+@app.route('/get-data', methods=['POST'])
+def get_data():
+    """Retrieve user's saved data from Supabase"""
+    try:
+        if not supabase_manager.enabled:
+            return jsonify({
+                "success": False,
+                "error": "Supabase is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables."
+            }), 503
+        
+        data = request.get_json()
+        session_id = data.get('session_id')
+        
+        # Verify session
+        user_email = validate_session(session_id)
+        if not user_email:
+            return jsonify({"error": "Invalid or expired session"}), 401
+        
+        user_data = supabase_manager.get_user_data(user_email)
+        
+        if user_data:
+            return jsonify({
+                "success": True,
+                "data": user_data
+            })
+        else:
+            return jsonify({
+                "success": True,
+                "data": {
+                    "id": None,
+                    "items": [],
+                    "recipes": []
+                }
+            })
+            
+    except Exception as e:
+        logger.error(f"Error retrieving data: {e}")
+        return jsonify({
+            "success": False,
+            "error": "Failed to retrieve data",
+            "details": str(e)
+        }), 500
+
+@app.route('/update-data', methods=['POST'])
+def update_data():
+    """Update user's existing data in Supabase"""
+    try:
+        if not supabase_manager.enabled:
+            return jsonify({
+                "success": False,
+                "error": "Supabase is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables."
+            }), 503
+        
+        data = request.get_json()
+        session_id = data.get('session_id')
+        items = data.get('items', [])
+        recipes = data.get('recipes', [])
+        
+        # Verify session
+        user_email = validate_session(session_id)
+        if not user_email:
+            return jsonify({"error": "Invalid or expired session"}), 401
+        
+        success = supabase_manager.update_user_data(user_email, items, recipes)
+        
+        if success:
+            return jsonify({
+                "success": True,
+                "message": "Data updated successfully"
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Failed to update data"
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error updating data: {e}")
+        return jsonify({
+            "success": False,
+            "error": "Failed to update data",
+            "details": str(e)
+        }), 500
+
+@app.route('/send-email', methods=['POST'])
+def send_email():
+    """Send email with grocery list and recipes to user"""
+    try:
+        if not supabase_manager.enabled:
+            return jsonify({
+                "success": False,
+                "error": "Supabase is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables."
+            }), 503
+        
+        data = request.get_json()
+        session_id = data.get('session_id')
+        items = data.get('items', [])
+        recipes = data.get('recipes', [])
+        
+        # Verify session
+        user_email = validate_session(session_id)
+        if not user_email:
+            return jsonify({"error": "Invalid or expired session"}), 401
+        
+        success = supabase_manager.send_grocery_list_email(user_email, items, recipes)
+        
+        if success:
+            return jsonify({
+                "success": True,
+                "message": "Email sent successfully"
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Failed to send email"
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error sending email: {e}")
+        return jsonify({
+            "success": False,
+            "error": "Failed to send email",
+            "details": str(e)
+        }), 500
+
 @app.route('/', methods=['GET'])
 def root():
     """Root endpoint"""
@@ -376,7 +651,11 @@ def root():
         "message": "ChopChop Backend API",
         "endpoints": {
             "/health": "GET - Health check",
-            "/chat": "POST - Send message to Nova Lite model"
+            "/chat": "POST - Send message to Nova Pro model",
+            "/save-data": "POST - Save user data to Supabase",
+            "/get-data": "POST - Retrieve user data from Supabase",
+            "/update-data": "POST - Update user data in Supabase",
+            "/send-email": "POST - Send email with grocery list and recipes"
         }
     })
 

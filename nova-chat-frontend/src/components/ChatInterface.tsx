@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect } from 'react';
 import GroceryList from './GroceryList';
 import Recipes from './Recipes';
+import { SupabaseService } from '../lib/supabase';
+import { authService } from '../lib/auth';
 
 interface Message {
   id: string;
@@ -12,6 +14,10 @@ interface Message {
   hasImage?: boolean;
   imageUrl?: string;
   structuredData?: any;
+}
+
+interface ChatInterfaceProps {
+  onSignOut: () => void;
 }
 
 interface GroceryItem {
@@ -37,7 +43,7 @@ interface Recipe {
   tips: string;
 }
 
-export default function ChatInterface() {
+export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isFridgeMode, setIsFridgeMode] = useState(false);
@@ -48,6 +54,9 @@ export default function ChatInterface() {
   const [activeTab, setActiveTab] = useState<'chat' | 'grocery' | 'recipes'>('chat');
   const [groceryItems, setGroceryItems] = useState<GroceryItem[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [userEmail, setUserEmail] = useState<string>('');
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isLoadingData, setIsLoadingData] = useState<boolean>(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -73,6 +82,80 @@ export default function ChatInterface() {
       setIsInitialized(true);
     }
   }, [isInitialized]);
+
+  // Load user data automatically on component mount
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (authService.isAuthenticated()) {
+        const user = authService.getCurrentUser();
+        if (user) {
+          setUserEmail(user.email);
+          
+          // Automatically load user's saved data
+          const sessionId = authService.getSessionId();
+          if (sessionId) {
+            try {
+              const response = await fetch('http://localhost:8000/get-data', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  session_id: sessionId
+                }),
+              });
+
+              const data = await response.json();
+
+              if (data.success && data.data) {
+                if (data.data.items && data.data.items.length > 0) {
+                  setGroceryItems(data.data.items);
+                }
+                if (data.data.recipes && data.data.recipes.length > 0) {
+                  setRecipes(data.data.recipes);
+                }
+              }
+            } catch (error) {
+              console.error('Error loading user data:', error);
+            }
+          }
+        }
+      }
+      setIsLoadingData(false);
+    };
+    
+    loadUserData();
+  }, []);
+
+  // Auto-save data when grocery items or recipes change
+  useEffect(() => {
+    if (!isLoadingData && authService.isAuthenticated()) {
+      const autoSave = async () => {
+        const sessionId = authService.getSessionId();
+        if (sessionId && (groceryItems.length > 0 || recipes.length > 0)) {
+          try {
+            await fetch('http://localhost:8000/save-data', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                session_id: sessionId,
+                items: groceryItems,
+                recipes: recipes,
+              }),
+            });
+          } catch (error) {
+            console.error('Error auto-saving data:', error);
+          }
+        }
+      };
+
+      // Debounce auto-save to avoid too many requests
+      const timeoutId = setTimeout(autoSave, 2000);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [groceryItems, recipes, isLoadingData]);
 
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -318,6 +401,153 @@ export default function ChatInterface() {
     }
   };
 
+  const handleSignOut = async () => {
+    await authService.signOut();
+    setGroceryItems([]);
+    setRecipes([]);
+    onSignOut();
+  };
+
+  const saveToSupabase = async () => {
+    const sessionId = authService.getSessionId();
+    if (!sessionId) {
+      alert('Session expired. Please sign in again.');
+      onSignOut();
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const response = await fetch('http://localhost:8000/save-data', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          session_id: sessionId,
+          items: groceryItems,
+          recipes: recipes
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert('Data saved successfully!');
+      } else {
+        if (response.status === 503) {
+          alert('Supabase is not configured. Please set up Supabase to enable data saving. See SUPABASE_SETUP.md for instructions.');
+        } else {
+          alert('Failed to save data. Please try again.');
+        }
+      }
+    } catch (error) {
+      console.error('Error saving to Supabase:', error);
+      alert('Error saving data. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const loadFromSupabase = async () => {
+    const sessionId = authService.getSessionId();
+    if (!sessionId) {
+      alert('Session expired. Please sign in again.');
+      onSignOut();
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:8000/get-data', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          session_id: sessionId
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        if (data.data && (data.data.items.length > 0 || data.data.recipes.length > 0)) {
+          setGroceryItems(data.data.items);
+          setRecipes(data.data.recipes);
+          alert('Data loaded successfully!');
+        } else {
+          alert('No saved data found for this email.');
+        }
+      } else {
+        if (response.status === 503) {
+          alert('Supabase is not configured. Please set up Supabase to enable data loading. See SUPABASE_SETUP.md for instructions.');
+        } else {
+          alert('Failed to load data. Please try again.');
+        }
+      }
+    } catch (error) {
+      console.error('Error loading from Supabase:', error);
+      alert('Error loading data. Please try again.');
+    }
+  };
+
+  const sendEmail = async () => {
+    const sessionId = authService.getSessionId();
+    if (!sessionId) {
+      alert('Session expired. Please sign in again.');
+      onSignOut();
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:8000/send-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          session_id: sessionId,
+          items: groceryItems,
+          recipes: recipes
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert('Email sent successfully!');
+      } else {
+        if (response.status === 503) {
+          alert('Supabase is not configured. Please set up Supabase to enable email sending. See SUPABASE_SETUP.md for instructions.');
+        } else {
+          alert('Failed to send email. Please try again.');
+        }
+      }
+    } catch (error) {
+      console.error('Error sending email:', error);
+      alert('Error sending email. Please try again.');
+    }
+  };
+
+
+  // Show loading screen while loading user data
+  if (isLoadingData) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        height: '100vh', 
+        backgroundColor: '#f9fafb',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🚀</div>
+        <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#1f2937' }}>Loading your data...</div>
+        <div style={{ color: '#6b7280', marginTop: '0.5rem' }}>Please wait while we load your saved recipes and grocery lists</div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#f9fafb' }}>
       {/* Header */}
@@ -327,39 +557,128 @@ export default function ChatInterface() {
             <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1f2937', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               🚀 ChopChop Chat
             </h1>
-            <p style={{ color: '#6b7280', fontSize: '0.875rem', margin: '0.25rem 0 0 0' }}>Powered by Amazon Bedrock</p>
+            <p style={{ color: '#6b7280', fontSize: '0.875rem', margin: '0.25rem 0 0 0' }}>
+              Powered by Amazon Bedrock
+              {userEmail && (
+                <span style={{ marginLeft: '1rem', color: '#10b981' }}>
+                  • Signed in as {userEmail}
+                </span>
+              )}
+            </p>
           </div>
-          <button
-            onClick={() => {
-              const input = document.createElement('input');
-              input.type = 'file';
-              input.accept = 'image/jpeg,image/jpg,image/png,image/gif,image/webp';
-              input.onchange = (e) => {
-                const file = (e.target as HTMLInputElement).files?.[0];
-                if (file) {
-                  uploadFridgePhoto(file);
-                }
-              };
-              input.click();
-            }}
-            disabled={isLoading}
-            style={{
-              backgroundColor: '#f59e0b',
-              color: 'white',
-              border: 'none',
-              borderRadius: '0.5rem',
-              padding: '0.75rem 1rem',
-              fontSize: '0.875rem',
-              fontWeight: '500',
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              opacity: isLoading ? 0.6 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}
-          >
-            {isLoading ? '⏳' : '📸'} Upload Fridge Photo
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <button
+              onClick={() => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/jpeg,image/jpg,image/png,image/gif,image/webp';
+                input.onchange = (e) => {
+                  const file = (e.target as HTMLInputElement).files?.[0];
+                  if (file) {
+                    uploadFridgePhoto(file);
+                  }
+                };
+                input.click();
+              }}
+              disabled={isLoading}
+              style={{
+                backgroundColor: '#f59e0b',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.5rem',
+                padding: '0.75rem 1rem',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                opacity: isLoading ? 0.6 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              {isLoading ? '⏳' : '📸'} Upload Fridge Photo
+            </button>
+            
+            <button
+              onClick={saveToSupabase}
+              disabled={isSaving || (groceryItems.length === 0 && recipes.length === 0)}
+              style={{
+                backgroundColor: '#10b981',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.5rem',
+                padding: '0.75rem 1rem',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                cursor: (isSaving || (groceryItems.length === 0 && recipes.length === 0)) ? 'not-allowed' : 'pointer',
+                opacity: (isSaving || (groceryItems.length === 0 && recipes.length === 0)) ? 0.6 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              {isSaving ? '⏳' : '💾'} Save Data
+            </button>
+            
+            <button
+              onClick={loadFromSupabase}
+              style={{
+                backgroundColor: '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.5rem',
+                padding: '0.75rem 1rem',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              📥 Load Data
+            </button>
+            
+            <button
+              onClick={sendEmail}
+              disabled={groceryItems.length === 0 && recipes.length === 0}
+              style={{
+                backgroundColor: '#8b5cf6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.5rem',
+                padding: '0.75rem 1rem',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                cursor: (groceryItems.length === 0 && recipes.length === 0) ? 'not-allowed' : 'pointer',
+                opacity: (groceryItems.length === 0 && recipes.length === 0) ? 0.6 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              📧 Send Email
+            </button>
+
+            <button
+              onClick={handleSignOut}
+              style={{
+                backgroundColor: '#ef4444',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.5rem',
+                padding: '0.75rem 1rem',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              🚪 Sign Out
+            </button>
+          </div>
         </div>
       </div>
 
@@ -547,6 +866,7 @@ export default function ChatInterface() {
         </div>
         </div>
       )}
+
 
       <style jsx>{`
         @keyframes spin {
