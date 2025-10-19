@@ -117,7 +117,8 @@ class SupabaseManager:
                 return {
                     'id': record['id'],
                     'items': json.loads(record['items']) if record.get('items') else [],
-                    'recipes': json.loads(record['recipes']) if record.get('recipes') else []
+                    'recipes': json.loads(record['recipes']) if record.get('recipes') else [],
+                    'recent_recipes': json.loads(record['recent_recipes']) if record.get('recent_recipes') else []
                 }
             else:
                 logger.info(f"No data found for user {user_email}")
@@ -125,6 +126,106 @@ class SupabaseManager:
                 
         except Exception as e:
             logger.error(f"Error retrieving user data: {e}")
+            return None
+
+    def add_recent_recipe(self, user_email: str, recipe: Dict) -> bool:
+        """
+        Add a recipe to the user's recent selections (keeps most recent 10).
+
+        Args:
+            user_email: User's email address
+            recipe: Recipe dict/object to add to recent list
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.enabled:
+            logger.warning("Supabase is not enabled. Cannot add recent recipe.")
+            return False
+
+        try:
+            # Fetch existing recent_recipes for the user
+            result = self.supabase.table('Users').select('recent_recipes').eq('email', user_email).execute()
+
+            if result.data and len(result.data) > 0:
+                raw = result.data[0].get('recent_recipes')
+                try:
+                    existing = json.loads(raw) if raw else []
+                except Exception:
+                    existing = raw if isinstance(raw, list) else []
+            else:
+                existing = []
+
+            # Remove duplicates by id or name if present
+            try:
+                recipe_id = recipe.get('id')
+            except Exception:
+                recipe_id = None
+
+            cleaned = []
+            for r in existing:
+                try:
+                    if recipe_id and r.get('id') and r.get('id') == recipe_id:
+                        continue
+                    if (not recipe_id) and recipe.get('name') and r.get('name') == recipe.get('name'):
+                        continue
+                except Exception:
+                    pass
+                cleaned.append(r)
+
+            # Prepend the new recipe so most recent is first
+            cleaned.insert(0, recipe)
+
+            # Trim to 10
+            cleaned = cleaned[:10]
+
+            data = {'recent_recipes': json.dumps(cleaned)}
+
+            if result.data:
+                update_res = self.supabase.table('Users').update(data).eq('email', user_email).execute()
+            else:
+                # Create a new user record if none exists
+                data_with_email = {'email': user_email, 'recent_recipes': json.dumps(cleaned)}
+                update_res = self.supabase.table('Users').insert(data_with_email).execute()
+
+            if update_res and update_res.data:
+                logger.info(f"Added recent recipe for {user_email}")
+                return True
+            else:
+                logger.error(f"Failed to add recent recipe for {user_email}")
+                return False
+
+        except Exception as e:
+            logger.error(f"Error adding recent recipe: {e}")
+            return False
+
+    def get_recent_recipes(self, user_email: str) -> Optional[List[Dict]]:
+        """
+        Retrieve the user's most recent recipes (up to 10).
+
+        Args:
+            user_email: User's email address
+
+        Returns:
+            List of recent recipe dicts, or None on error
+        """
+        if not self.enabled:
+            logger.warning("Supabase is not enabled. Cannot retrieve recent recipes.")
+            return None
+
+        try:
+            result = self.supabase.table('Users').select('recent_recipes').eq('email', user_email).execute()
+            if result.data and len(result.data) > 0:
+                raw = result.data[0].get('recent_recipes')
+                try:
+                    recent = json.loads(raw) if raw else []
+                except Exception:
+                    recent = raw if isinstance(raw, list) else []
+                return recent
+            else:
+                return []
+        except Exception as e:
+            logger.error(f"Error retrieving recent recipes: {e}")
             return None
     
     def update_user_data(self, user_email: str, items: List[Dict], recipes: List[Dict]) -> bool:
