@@ -477,6 +477,69 @@ def chat():
             "details": str(e)
         }), 500
 
+@app.route('/recent-recipes/add', methods=['POST'])
+def add_recent_recipe():
+    """Add a selected recipe to user's recent recipes (keep last 10)"""
+    try:
+        if not supabase_manager.enabled:
+            return jsonify({
+                "success": False,
+                "error": "Supabase is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables."
+            }), 503
+
+        data = request.get_json()
+        session_id = data.get('session_id')
+        recipe = data.get('recipe')
+
+        # Validate session
+        user_email = validate_session(session_id)
+        if not user_email:
+            return jsonify({"error": "Invalid or expired session"}), 401
+
+        if not recipe or not isinstance(recipe, dict):
+            return jsonify({"error": "Recipe object is required"}), 400
+
+        success = supabase_manager.add_recent_recipe(user_email, recipe)
+
+        if success:
+            return jsonify({"success": True, "message": "Recent recipe added"})
+        else:
+            return jsonify({"success": False, "error": "Failed to add recent recipe"}), 500
+
+    except Exception as e:
+        logger.error(f"Error adding recent recipe: {e}")
+        return jsonify({"success": False, "error": "Failed to add recent recipe", "details": str(e)}), 500
+
+
+@app.route('/recent-recipes/get', methods=['POST'])
+def get_recent_recipes():
+    """Get the user's recent recipes (up to 10)"""
+    try:
+        if not supabase_manager.enabled:
+            return jsonify({
+                "success": False,
+                "error": "Supabase is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables."
+            }), 503
+
+        data = request.get_json()
+        session_id = data.get('session_id')
+
+        # Validate session
+        user_email = validate_session(session_id)
+        if not user_email:
+            return jsonify({"error": "Invalid or expired session"}), 401
+
+        recent = supabase_manager.get_recent_recipes(user_email)
+
+        if recent is None:
+            return jsonify({"success": False, "error": "Failed to retrieve recent recipes"}), 500
+        else:
+            return jsonify({"success": True, "recent_recipes": recent})
+
+    except Exception as e:
+        logger.error(f"Error retrieving recent recipes: {e}")
+        return jsonify({"success": False, "error": "Failed to retrieve recent recipes", "details": str(e)}), 500
+
 @app.route('/save-data', methods=['POST'])
 def save_data():
     """Save user's grocery items and recipes to Supabase"""
