@@ -210,21 +210,22 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
             marginBottom: '3rem',
           }}>
             <div style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
               padding: '2.5rem',
               borderRadius: '20px',
-              boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
+              boxShadow: '0 10px 30px rgba(0, 0, 0, 0.15)',
               textAlign: 'center',
               transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-              backdropFilter: 'blur(10px)',
+              backdropFilter: 'blur(15px)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
             }}
             onMouseOver={(e) => {
               e.currentTarget.style.transform = 'translateY(-5px)';
-              e.currentTarget.style.boxShadow = '0 15px 40px rgba(0, 0, 0, 0.15)';
+              e.currentTarget.style.boxShadow = '0 15px 40px rgba(0, 0, 0, 0.2)';
             }}
             onMouseOut={(e) => {
               e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.1)';
+              e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.15)';
             }}>
               <div style={{ 
                 fontSize: '3rem', 
@@ -234,13 +235,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
               <h3 style={{ 
                 fontSize: '1.5rem', 
                 fontWeight: '700', 
-                color: '#1f2937', 
+                color: '#1e293b', 
                 marginBottom: '1rem' 
               }}>
                 Smart Fridge Analysis
               </h3>
               <p style={{ 
-                color: '#6b7280', 
+                color: '#475569', 
                 fontSize: '1rem',
                 lineHeight: '1.6',
               }}>
@@ -250,21 +251,22 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
             </div>
 
             <div style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
               padding: '2.5rem',
               borderRadius: '20px',
-              boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
+              boxShadow: '0 10px 30px rgba(0, 0, 0, 0.15)',
               textAlign: 'center',
               transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-              backdropFilter: 'blur(10px)',
+              backdropFilter: 'blur(15px)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
             }}
             onMouseOver={(e) => {
               e.currentTarget.style.transform = 'translateY(-5px)';
-              e.currentTarget.style.boxShadow = '0 15px 40px rgba(0, 0, 0, 0.15)';
+              e.currentTarget.style.boxShadow = '0 15px 40px rgba(0, 0, 0, 0.2)';
             }}
             onMouseOut={(e) => {
               e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.1)';
+              e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.15)';
             }}>
               <div style={{ 
                 fontSize: '3rem', 
@@ -274,13 +276,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
               <h3 style={{ 
                 fontSize: '1.5rem', 
                 fontWeight: '700', 
-                color: '#1f2937', 
+                color: '#1e293b', 
                 marginBottom: '1rem' 
               }}>
                 AI Recipe Generation
               </h3>
               <p style={{ 
-                color: '#6b7280', 
+                color: '#475569', 
                 fontSize: '1rem',
                 lineHeight: '1.6',
               }}>
@@ -290,21 +292,22 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
             </div>
 
             <div style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
               padding: '2.5rem',
               borderRadius: '20px',
-              boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
+              boxShadow: '0 10px 30px rgba(0, 0, 0, 0.15)',
               textAlign: 'center',
               transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-              backdropFilter: 'blur(10px)',
+              backdropFilter: 'blur(15px)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
             }}
             onMouseOver={(e) => {
               e.currentTarget.style.transform = 'translateY(-5px)';
-              e.currentTarget.style.boxShadow = '0 15px 40px rgba(0, 0, 0, 0.15)';
+              e.currentTarget.style.boxShadow = '0 15px 40px rgba(0, 0, 0, 0.2)';
             }}
             onMouseOut={(e) => {
               e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.1)';
+              e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.15)';
             }}>
               <div style={{ 
                 fontSize: '3rem', 
@@ -314,13 +317,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
               <h3 style={{ 
                 fontSize: '1.5rem', 
                 fontWeight: '700', 
-                color: '#1f2937', 
+                color: '#1e293b', 
                 marginBottom: '1rem' 
               }}>
                 Smart Grocery Lists
               </h3>
               <p style={{ 
-                color: '#6b7280', 
+                color: '#475569', 
                 fontSize: '1rem',
                 lineHeight: '1.6',
               }}>
@@ -341,7 +344,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
             textAlign: 'center',
             fontSize: 'clamp(1.8rem, 4vw, 2.5rem)',
             fontWeight: '700',
-            color: 'white',
+            background: 'linear-gradient(45deg, #ffffff 0%, #f8fafc 50%, #e2e8f0 100%)',
+            backgroundClip: 'text',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
             marginBottom: '3rem',
             textShadow: '0 2px 4px rgba(0,0,0,0.1)',
           }}>
@@ -349,11 +355,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
           </h2>
           
           <div style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
             padding: '3rem',
             borderRadius: '20px',
-            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
-            backdropFilter: 'blur(10px)',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.15)',
+            backdropFilter: 'blur(15px)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
           }}>
             <div style={{
               display: 'grid',
@@ -370,12 +377,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
                 <h3 style={{ 
                   fontSize: '1.25rem', 
                   fontWeight: '600', 
-                  color: '#1f2937', 
+                  color: '#1e293b', 
                   marginBottom: '0.5rem' 
                 }}>
                   1. Upload Photo
                 </h3>
-                <p style={{ color: '#6b7280', fontSize: '0.9rem' }}>
+                <p style={{ color: '#475569', fontSize: '0.9rem' }}>
                   Take a photo of your fridge contents
                 </p>
               </div>
@@ -389,12 +396,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
                 <h3 style={{ 
                   fontSize: '1.25rem', 
                   fontWeight: '600', 
-                  color: '#1f2937', 
+                  color: '#1e293b', 
                   marginBottom: '0.5rem' 
                 }}>
                   2. AI Analysis
                 </h3>
-                <p style={{ color: '#6b7280', fontSize: '0.9rem' }}>
+                <p style={{ color: '#475569', fontSize: '0.9rem' }}>
                   Our AI identifies ingredients and freshness
                 </p>
               </div>
@@ -408,12 +415,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
                 <h3 style={{ 
                   fontSize: '1.25rem', 
                   fontWeight: '600', 
-                  color: '#1f2937', 
+                  color: '#1e293b', 
                   marginBottom: '0.5rem' 
                 }}>
                   3. Get Recipes
                 </h3>
-                <p style={{ color: '#6b7280', fontSize: '0.9rem' }}>
+                <p style={{ color: '#475569', fontSize: '0.9rem' }}>
                   Receive personalized recipe suggestions
                 </p>
               </div>
@@ -423,27 +430,28 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
 
         {/* Final CTA Section */}
         <div style={{
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
           padding: '3rem',
           borderRadius: '20px',
-          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.15)',
           width: '100%',
           maxWidth: '600px',
           textAlign: 'center',
-          backdropFilter: 'blur(10px)',
+          backdropFilter: 'blur(15px)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
           marginBottom: '3rem',
         }}>
           <h2 style={{
             fontSize: 'clamp(1.5rem, 3vw, 2rem)',
             fontWeight: '700',
-            color: '#1f2937',
+            color: '#1e293b',
             marginBottom: '1rem',
           }}>
             Ready to Transform Your Kitchen?
           </h2>
           
           <p style={{
-            color: '#6b7280',
+            color: '#475569',
             marginBottom: '2rem',
             fontSize: '1.1rem',
             lineHeight: '1.6',
@@ -465,21 +473,21 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
                 padding: '1rem 2rem',
                 border: 'none',
                 borderRadius: '50px',
-                backgroundColor: '#ff6b6b',
+                background: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 50%, #ec4899 100%)',
                 color: 'white',
                 fontSize: '1.1rem',
                 fontWeight: '600',
                 cursor: 'pointer',
                 transition: 'all 0.3s ease',
-                boxShadow: '0 4px 15px rgba(255, 107, 107, 0.3)',
+                boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)',
               }}
               onMouseOver={(e) => {
                 e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 6px 20px rgba(255, 107, 107, 0.4)';
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(245, 158, 11, 0.5)';
               }}
               onMouseOut={(e) => {
                 e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 15px rgba(255, 107, 107, 0.3)';
+                e.currentTarget.style.boxShadow = '0 4px 15px rgba(245, 158, 11, 0.4)';
               }}
             >
               🚀 Start Cooking Smarter
@@ -492,7 +500,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
             alignItems: 'center',
             gap: '2rem',
             fontSize: '0.9rem',
-            color: '#9ca3af',
+            color: '#64748b',
             flexWrap: 'wrap',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -513,7 +521,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
         {/* Footer */}
         <div style={{
           textAlign: 'center',
-          color: 'rgba(255, 255, 255, 0.8)',
+          color: 'rgba(248, 250, 252, 0.9)',
           fontSize: '0.9rem',
           maxWidth: '800px',
           marginBottom: '2rem',
