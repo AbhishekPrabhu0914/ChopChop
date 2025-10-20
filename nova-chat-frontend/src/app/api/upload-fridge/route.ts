@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { imageBase64, imageFormat, session_id } = body;
+    const { imageBase64, imageFormat, email } = body;
 
     if (!imageBase64) {
       return NextResponse.json(
@@ -22,9 +22,9 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         message: "Analyze this fridge photo and suggest recipes based on the ingredients you can see. List the ingredients first, then provide 2-3 recipe suggestions with cooking instructions.",
-        imageBase64,
-        imageFormat,
-        session_id
+        imageBase64: imageBase64,
+        imageFormat: imageFormat,
+        email
       }),
     });
 

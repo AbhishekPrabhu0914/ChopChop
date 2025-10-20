@@ -13,7 +13,7 @@ fi
 # Start Python backend
 echo "🐍 Starting Python backend server..."
 cd backend
-python nova_backend.py &
+python nova_backend_simplified.py &
 BACKEND_PID=$!
 cd ..
 

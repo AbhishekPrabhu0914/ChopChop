@@ -1,9 +1,7 @@
 /**
- * Authentication service for ChopChop
- * Handles authentication with Amazon Cognito
+ * Ultra-Simple Authentication Service for ChopChop
+ * Just asks for email, no verification, no passwords, no localStorage
  */
-
-import { CognitoUser, CognitoUserPool, CognitoUserAttribute, AuthenticationDetails, CognitoUserSession } from 'amazon-cognito-identity-js';
 
 export interface AuthUser {
   email: string;
@@ -19,282 +17,78 @@ export interface AuthResponse {
   error?: string;
 }
 
-// Initialize Cognito User Pool
-const userPool = new CognitoUserPool({
-  UserPoolId: process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID || '',
-  ClientId: process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || '',
-});
-
-// Generate SECRET_HASH for Cognito authentication
-const generateSecretHash = async (username: string): Promise<string> => {
-  const clientId = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || '';
-  const clientSecret = process.env.NEXT_PUBLIC_COGNITO_CLIENT_SECRET || '';
-  
-  if (!clientSecret) {
-    console.warn('COGNITO_CLIENT_SECRET not found in environment variables');
-    return '';
-  }
-  
-  const message = username + clientId;
-  
-  // Use Web Crypto API for HMAC-SHA256
-  const encoder = new TextEncoder();
-  const keyData = encoder.encode(clientSecret);
-  const messageData = encoder.encode(message);
-  
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    keyData,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  
-  const signature = await crypto.subtle.sign('HMAC', cryptoKey, messageData);
-  const secretHash = btoa(String.fromCharCode(...new Uint8Array(signature)));
-  console.log('Generated SECRET_HASH:', secretHash);
-  
-  return secretHash;
-};
-
-// Helper function to create CognitoUser with client secret
-const createCognitoUser = (username: string) => {
-  const userData: any = {
-    Username: username,
-    Pool: userPool,
-  };
-  
-  // If client secret is configured, add it to the user data
-  const clientSecret = process.env.NEXT_PUBLIC_COGNITO_CLIENT_SECRET;
-  if (clientSecret) {
-    userData.ClientSecret = clientSecret;
-  }
-  
-  return new CognitoUser(userData);
-};
-
-class AuthService {
+class SimpleAuthService {
   private sessionId: string | null = null;
   private user: AuthUser | null = null;
 
   constructor() {
-    // Load session from localStorage on initialization
-    this.loadSession();
+    // No localStorage, no session persistence
+    // Just start fresh every time
   }
 
   /**
-   * Sign in with email and password
+   * Enter app with just email (no password needed)
    */
-  async signIn(email: string, password: string): Promise<AuthResponse> {
+  async enterApp(email: string): Promise<AuthResponse> {
     try {
-      return new Promise(async (resolve) => {
-        // Generate SECRET_HASH if client secret is configured
-        const secretHash = await generateSecretHash(email);
-        
-        const cognitoUser = createCognitoUser(email);
-        
-        const authenticationDetails = new AuthenticationDetails({
-          Username: email,
-          Password: password,
-        });
-
-        // Add SECRET_HASH to authentication details if available
-        if (secretHash) {
-          (authenticationDetails as any).validationData = [
-            {
-              Name: 'SECRET_HASH',
-              Value: secretHash,
-            },
-          ];
-          console.log('Added SECRET_HASH to authentication details');
-        } else {
-          console.log('No SECRET_HASH to add');
-        }
-
-        cognitoUser.authenticateUser(authenticationDetails, {
-          onSuccess: (result) => {
-            const accessToken = result.getAccessToken().getJwtToken();
-            const idToken = result.getIdToken().getJwtToken();
-            
-            this.sessionId = accessToken;
-            this.user = {
-              email: email,
-              sessionId: accessToken,
-              username: email,
-            };
-            this.saveSession();
-            
-            resolve({
-              success: true,
-              message: 'Signed in successfully',
-              email: email,
-              session_id: accessToken,
-            });
-          },
-          onFailure: (err) => {
-            resolve({
-              success: false,
-              message: err.message || 'Invalid email or password',
-              error: err.message || 'Authentication failed',
-            });
-          },
-          newPasswordRequired: (userAttributes, requiredAttributes) => {
-            // Handle new password requirement if needed
-            resolve({
-              success: false,
-              message: 'New password required. Please contact support.',
-              error: 'New password required',
-            });
-          },
-        });
-      });
-    } catch (error) {
-      console.error('Sign in error:', error);
-      return {
-        success: false,
-        message: 'Network error during sign in',
-        error: 'Network error',
-      };
-    }
-  }
-
-  /**
-   * Sign up with email and password
-   */
-  async signUp(email: string, password: string): Promise<AuthResponse> {
-    try {
-      return new Promise(async (resolve) => {
-        const attributes = [
-          new CognitoUserAttribute({ Name: 'email', Value: email }),
-        ];
-
-        // Generate SECRET_HASH if client secret is configured
-        const secretHash = await generateSecretHash(email);
-        const validationData: any[] = [];
-        
-        if (secretHash) {
-          validationData.push({
-            Name: 'SECRET_HASH',
-            Value: secretHash,
-          });
-        }
-
-        userPool.signUp(email, password, attributes, validationData, (err, result) => {
-          if (err) {
-            resolve({
-              success: false,
-              message: err.message || 'Failed to create account',
-              error: err.message || 'Sign up failed',
-            });
-            return;
-          }
-
-          if (result) {
-            resolve({
-              success: true,
-              message: 'Account created successfully. Please check your email for verification.',
-              email: email,
-            });
-          } else {
-            resolve({
-              success: false,
-              message: 'Failed to create account',
-              error: 'Unknown error',
-            });
-          }
-        });
-      });
-    } catch (error) {
-      console.error('Sign up error:', error);
-      return {
-        success: false,
-        message: 'Network error during sign up',
-        error: 'Network error',
-      };
-    }
-  }
-
-  /**
-   * Verify current session
-   */
-  async verifySession(): Promise<AuthResponse> {
-    try {
-      const cognitoUser = userPool.getCurrentUser();
-      
-      if (!cognitoUser) {
+      // Simple validation - just check if email is not empty
+      if (!email.trim()) {
         return {
           success: false,
-          message: 'No active session',
-          error: 'No session',
+          message: 'Please enter your email address',
+          error: 'Email required',
         };
       }
 
-      return new Promise((resolve) => {
-        cognitoUser.getSession((err: any, session: any) => {
-          if (err) {
-            this.clearSession();
-            resolve({
-              success: false,
-              message: 'Session expired',
-              error: 'Session expired',
-            });
-            return;
-          }
+      // Basic email format check
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.trim())) {
+        return {
+          success: false,
+          message: 'Please enter a valid email address',
+          error: 'Invalid email format',
+        };
+      }
 
-          if (session.isValid()) {
-            const accessToken = session.getAccessToken().getJwtToken();
-            const idToken = session.getIdToken().getJwtToken();
-            
-            this.sessionId = accessToken;
-            this.user = {
-              email: idToken.payload.email,
-              sessionId: accessToken,
-              username: idToken.payload['cognito:username'],
-            };
-            this.saveSession();
-            
-            resolve({
-              success: true,
-              message: 'Session is valid',
-              email: idToken.payload.email,
-              session_id: accessToken,
-            });
-          } else {
-            this.clearSession();
-            resolve({
-              success: false,
-              message: 'Session expired',
-              error: 'Session expired',
-            });
-          }
-        });
-      });
+      // Create a simple session ID
+      const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      this.sessionId = sessionId;
+      this.user = {
+        email: email.trim(),
+        sessionId: sessionId,
+        username: email.trim(),
+      };
+
+      return {
+        success: true,
+        message: 'Welcome to ChopChop!',
+        email: email.trim(),
+        session_id: sessionId,
+      };
     } catch (error) {
-      console.error('Session verification error:', error);
+      console.error('Enter app error:', error);
       return {
         success: false,
-        message: 'Network error during verification',
-        error: 'Network error',
+        message: 'Failed to enter app',
+        error: 'Enter app error',
       };
     }
   }
 
   /**
-   * Sign out user
+   * Sign out
    */
   async signOut(): Promise<void> {
-    try {
-      const cognitoUser = userPool.getCurrentUser();
-      if (cognitoUser) {
-        cognitoUser.signOut();
-      }
-    } catch (error) {
-      console.error('Sign out error:', error);
-    }
-
     this.sessionId = null;
     this.user = null;
-    this.clearSession();
+  }
+
+  /**
+   * Check if user is authenticated
+   */
+  isAuthenticated(): boolean {
+    return this.sessionId !== null && this.user !== null;
   }
 
   /**
@@ -305,60 +99,42 @@ class AuthService {
   }
 
   /**
-   * Check if user is authenticated
-   */
-  isAuthenticated(): boolean {
-    return this.user !== null && this.sessionId !== null;
-  }
-
-  /**
-   * Get session ID for API calls
+   * Get current session ID
    */
   getSessionId(): string | null {
     return this.sessionId;
   }
 
   /**
-   * Save session to localStorage
+   * Verify current session (always returns success if session exists)
    */
-  private saveSession(): void {
-    if (typeof window !== 'undefined' && this.user && this.sessionId) {
-      localStorage.setItem('chopchop_session', JSON.stringify({
-        sessionId: this.sessionId,
-        user: this.user,
-      }));
-    }
-  }
-
-  /**
-   * Load session from localStorage
-   */
-  private loadSession(): void {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('chopchop_session');
-        if (saved) {
-          const { sessionId, user } = JSON.parse(saved);
-          this.sessionId = sessionId;
-          this.user = user;
-        }
-      } catch (error) {
-        console.error('Error loading session:', error);
-        this.clearSession();
+  async verifySession(): Promise<AuthResponse> {
+    try {
+      if (!this.sessionId || !this.user) {
+        return {
+          success: false,
+          message: 'No active session',
+          error: 'No session',
+        };
       }
-    }
-  }
 
-  /**
-   * Clear session from localStorage
-   */
-  private clearSession(): void {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('chopchop_session');
+      return {
+        success: true,
+        message: 'Session is valid',
+        email: this.user.email,
+        session_id: this.sessionId,
+      };
+    } catch (error) {
+      console.error('Session verification error:', error);
+      return {
+        success: false,
+        message: 'Session verification failed',
+        error: 'Session error',
+      };
     }
   }
 }
 
 // Export singleton instance
-export const authService = new AuthService();
-
+export const authService = new SimpleAuthService();
+export default authService;

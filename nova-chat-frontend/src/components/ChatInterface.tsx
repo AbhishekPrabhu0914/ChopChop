@@ -98,39 +98,16 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
           setUserEmail(user.email);
           
           // Automatically load user's saved data
-          const sessionId = authService.getSessionId();
-          if (sessionId) {
+          if (user) {
             try {
-              // First validate the session with the backend
-              const verifyResponse = await fetch('http://localhost:8000/auth/verify', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  session_id: sessionId
-                }),
-              });
-
-              const verifyResult = await verifyResponse.json();
-              
-              if (!verifyResult.success) {
-                // Session is invalid, sign out the user and show sign-in prompt
-                console.log('Session expired, signing out user');
-                authService.signOut();
-                setUserEmail('');
-                // The App component will handle showing the landing page
-                return;
-              }
-              
-              // Load grocery items and recipes
+              // Load user's saved data
               const dataResponse = await fetch('/api/get-data', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                  session_id: sessionId
+                  email: user?.email
                 }),
               });
 
@@ -161,7 +138,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
                   'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                  session_id: sessionId
+                  email: user?.email
                 }),
               });
 
@@ -198,8 +175,8 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
   useEffect(() => {
     if (!isLoadingData && authService.isAuthenticated()) {
       const autoSave = async () => {
-        const sessionId = authService.getSessionId();
-        if (sessionId && (groceryItems.length > 0 || recipes.length > 0 || pantryItems.length > 0)) {
+        const user = authService.getCurrentUser();
+        if (user && (groceryItems.length > 0 || recipes.length > 0 || pantryItems.length > 0)) {
           try {
             // Convert pantry items back to grocery items format for saving
             const updatedGroceryItems = pantryItems.map(pantryItem => ({
@@ -219,7 +196,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                session_id: sessionId,
+                email: user?.email,
                 items: updatedGroceryItems,
                 recipes: recipes,
               }),
@@ -288,7 +265,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
       });
 
       console.log('Sending request to backend with imageBase64 length:', imageBase64.length);
-      const sessionId = authService.getSessionId();
+      const user = authService.getCurrentUser();
       const response = await fetch('/api/upload-fridge', {
         method: 'POST',
         headers: {
@@ -297,7 +274,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
         body: JSON.stringify({
           imageBase64,
           imageFormat: file.type.split('/')[1],
-          session_id: sessionId
+          email: user?.email
         }),
       });
 
@@ -393,7 +370,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
     setIsLoading(true);
 
     try {
-      const sessionId = authService.getSessionId();
+      const user = authService.getCurrentUser();
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -401,7 +378,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
         },
         body: JSON.stringify({
           message: inputMessage,
-          session_id: sessionId
+          email: user?.email
         }),
       });
 
@@ -453,8 +430,8 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
 
 
   const sendEmail = async () => {
-    const sessionId = authService.getSessionId();
-    if (!sessionId) {
+    const user = authService.getCurrentUser();
+    if (!user) {
       alert('Session expired. Please sign in again.');
       onSignOut();
       return;
@@ -467,7 +444,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          session_id: sessionId,
+          email: user?.email,
           items: groceryItems,
           recipes: recipes
         }),
@@ -699,7 +676,6 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
           <Pantry 
             initialItems={pantryItems} 
             onUpdate={setPantryItems}
-            onRecipesGenerated={setRecipes}
           />
         )}
 
@@ -711,7 +687,11 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
         )}
 
         {activeTab === 'recipes' && (
-          <Recipes recipes={recipes} />
+          <Recipes 
+            recipes={recipes} 
+            pantryItems={pantryItems}
+            onRecipesGenerated={setRecipes}
+          />
         )}
       </div>
 

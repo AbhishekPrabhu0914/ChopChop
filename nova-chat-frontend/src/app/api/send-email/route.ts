@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, items, recipes } = await request.json();
+    const { email, subject, message } = await request.json();
 
     if (!email) {
       return NextResponse.json(
@@ -19,8 +19,8 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         email,
-        items,
-        recipes
+        subject,
+        message
       }),
     });
 
