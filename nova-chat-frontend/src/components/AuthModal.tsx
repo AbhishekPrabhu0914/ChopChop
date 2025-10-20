@@ -9,13 +9,17 @@ interface AuthModalProps {
 
 const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setEmail('');
+      setPassword('');
       setError('');
+      setIsSignUp(false);
     }
   }, [isOpen]);
 
@@ -25,18 +29,33 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
       setError('Please enter your email address');
       return;
     }
+    if (!password.trim()) {
+      setError('Please enter your password');
+      return;
+    }
 
     setIsLoading(true);
     setError('');
 
     try {
-      const response: AuthResponse = await authService.signIn(email.trim());
+      let response: AuthResponse;
+      
+      if (isSignUp) {
+        response = await authService.signUp(email.trim(), password.trim());
+      } else {
+        response = await authService.signIn(email.trim(), password.trim());
+      }
       
       if (response.success) {
-        onSuccess(response.email!);
-        onClose();
+        if (isSignUp) {
+          setError('Account created successfully. Please check your email to confirm your account.');
+          setIsSignUp(false); // Switch back to sign-in mode
+        } else {
+          onSuccess(response.email!);
+          onClose();
+        }
       } else {
-        setError(response.error || response.message || 'Sign in failed');
+        setError(response.error || response.message || 'Authentication failed');
       }
     } catch (error) {
       setError('An unexpected error occurred');
@@ -76,7 +95,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
           marginBottom: '1rem',
           textAlign: 'center',
         }}>
-          🚀 Welcome to ChopChop
+          {isSignUp ? '🚀 Create Account' : '🚀 Welcome to ChopChop'}
         </h2>
         
         <p style={{
@@ -84,7 +103,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
           marginBottom: '1.5rem',
           textAlign: 'center',
         }}>
-          Enter your email to get started with your kitchen assistant
+          {isSignUp 
+            ? 'Create your account to start using ChopChop' 
+            : 'Sign in to your ChopChop account'
+          }
         </p>
 
         <form onSubmit={handleSubmit}>
@@ -111,14 +133,67 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
                 border: '1px solid #d1d5db',
                 borderRadius: '0.375rem',
                 fontSize: '1rem',
+                color: '#000000',
                 outline: 'none',
                 transition: 'border-color 0.2s',
                 backgroundColor: isLoading ? '#f9fafb' : 'white',
+                WebkitTextFillColor: '#000000',
               }}
-              onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
-              onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#3b82f6';
+                e.target.style.color = '#000000';
+                e.target.style.webkitTextFillColor = '#000000';
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = '#d1d5db';
+                e.target.style.color = '#000000';
+                e.target.style.webkitTextFillColor = '#000000';
+              }}
             />
           </div>
+          
+          <div style={{ marginBottom: '1rem' }}>
+            <label htmlFor="password" style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              color: '#374151',
+              marginBottom: '0.5rem',
+            }}>
+              Password
+            </label>
+            <input
+              type="password"
+              id="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your password"
+              disabled={isLoading}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                fontSize: '1rem',
+                color: '#000000',
+                outline: 'none',
+                transition: 'border-color 0.2s',
+                backgroundColor: isLoading ? '#f9fafb' : 'white',
+                WebkitTextFillColor: '#000000',
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#3b82f6';
+                e.target.style.color = '#000000';
+                e.target.style.webkitTextFillColor = '#000000';
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = '#d1d5db';
+                e.target.style.color = '#000000';
+                e.target.style.webkitTextFillColor = '#000000';
+              }}
+            />
+          </div>
+
 
           {error && (
             <div style={{
@@ -156,25 +231,70 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
             </button>
             <button
               type="submit"
-              disabled={isLoading || !email.trim()}
+              disabled={isLoading || !email.trim() || !password.trim()}
               style={{
                 flex: 1,
                 padding: '0.75rem',
                 border: 'none',
                 borderRadius: '0.375rem',
-                backgroundColor: isLoading || !email.trim() ? '#9ca3af' : '#3b82f6',
+                backgroundColor: isLoading || !email.trim() || !password.trim() ? '#9ca3af' : '#3b82f6',
                 color: 'white',
                 fontSize: '1rem',
                 fontWeight: '500',
-                cursor: isLoading || !email.trim() ? 'not-allowed' : 'pointer',
+                cursor: isLoading || !email.trim() || !password.trim() ? 'not-allowed' : 'pointer',
                 transition: 'background-color 0.2s',
               }}
             >
-              {isLoading ? 'Signing In...' : 'Sign In'}
+              {isLoading 
+                ? (isSignUp ? 'Signing Up...' : 'Signing In...') 
+                : (isSignUp ? 'Sign Up' : 'Sign In')
+              }
             </button>
           </div>
         </form>
+        
+        {/* Sign Up/Sign In Toggle */}
+        <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+            <div style={{ 
+              fontSize: '0.875rem',
+              color: '#6b7280',
+              marginBottom: '0.5rem'
+            }}>
+              {isSignUp ? 'Already have an account?' : "Don't have an account?"}
+            </div>
+            
+            <button
+              type="button"
+              onClick={() => {
+                setIsSignUp(!isSignUp);
+                setError('');
+              }}
+              disabled={isLoading}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#3b82f6',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                textDecoration: 'underline',
+                opacity: isLoading ? 0.5 : 1,
+              }}
+            >
+              {isSignUp ? 'Sign In' : 'Sign Up'}
+            </button>
+          </div>
       </div>
+      
+      <style jsx>{`
+        #email, #password {
+          color: #000000 !important;
+          -webkit-text-fill-color: #000000 !important;
+        }
+        #email::placeholder, #password::placeholder {
+          color: #9ca3af !important;
+        }
+      `}</style>
     </div>
   );
 };

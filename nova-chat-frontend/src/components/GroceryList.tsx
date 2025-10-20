@@ -31,8 +31,8 @@ export default function GroceryList({ initialItems, onUpdate }: GroceryListProps
     if (newItem.trim()) {
       const item: GroceryItem = {
         item: newItem.trim(),
-        category: newCategory || 'general',
-        needed_for: 'Manual addition',
+        category: newCategory || 'other',
+        needed_for: 'manual',
         priority: 'medium',
         checked: false
       };
@@ -42,55 +42,75 @@ export default function GroceryList({ initialItems, onUpdate }: GroceryListProps
     }
   };
 
-  const toggleItem = (index: number) => {
-    const updatedItems = items.map((item, i) => 
-      i === index ? { ...item, checked: !item.checked } : item
-    );
-    setItems(updatedItems);
-  };
-
   const removeItem = (index: number) => {
-    const updatedItems = items.filter((_, i) => i !== index);
-    setItems(updatedItems);
+    setItems(items.filter((_, i) => i !== index));
   };
 
-  const updateItem = (index: number, field: keyof GroceryItem, value: any) => {
-    const updatedItems = items.map((item, i) => 
+  const toggleChecked = (index: number) => {
+    setItems(items.map((item, i) => 
+      i === index ? { ...item, checked: !item.checked } : item
+    ));
+  };
+
+  const updateItem = (index: number, field: keyof GroceryItem, value: string) => {
+    setItems(items.map((item, i) => 
       i === index ? { ...item, [field]: value } : item
-    );
-    setItems(updatedItems);
+    ));
   };
 
-  const filteredItems = items.filter(item => 
-    filter === 'all' || item.priority === filter
-  );
+  const filteredItems = items.filter(item => {
+    if (filter === 'all') return true;
+    return item.priority === filter;
+  });
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return '#ef4444';
-      case 'medium': return '#f59e0b';
-      case 'low': return '#10b981';
-      default: return '#6b7280';
-    }
-  };
+  const categories = ['vegetables', 'fruits', 'dairy', 'meat', 'poultry', 'seafood', 'grains', 'condiments', 'beverages', 'snacks', 'other'];
 
-  const getCategoryColor = (category: string) => {
-    const colors = {
-      'dairy': '#fef3c7',
-      'vegetables': '#dcfce7',
-      'meat': '#fecaca',
-      'pantry': '#e0e7ff',
-      'frozen': '#dbeafe',
-      'general': '#f3f4f6'
-    };
-    return colors[category as keyof typeof colors] || '#f3f4f6';
+  const generateAmazonSearchUrl = (itemName: string) => {
+    const encodedItem = encodeURIComponent(itemName);
+    return `https://www.amazon.com/s?k=${encodedItem}`;
   };
 
   return (
     <div style={{ padding: '1rem', maxWidth: '800px', margin: '0 auto' }}>
-      <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#1f2937' }}>
-        🛒 Grocery List
-      </h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>
+          🛒 Grocery List
+        </h2>
+      </div>
+
+      <p style={{ color: '#6b7280', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
+        Manage your grocery items and track what you need to buy.
+      </p>
+
+      {/* Filter buttons */}
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+        {[
+          { key: 'all', label: 'All', count: items.length },
+          { key: 'high', label: 'High Priority', count: items.filter(item => item.priority === 'high').length },
+          { key: 'medium', label: 'Medium Priority', count: items.filter(item => item.priority === 'medium').length },
+          { key: 'low', label: 'Low Priority', count: items.filter(item => item.priority === 'low').length }
+        ].map(({ key, label, count }) => (
+          <button
+            key={key}
+            onClick={() => setFilter(key as any)}
+            style={{
+              backgroundColor: filter === key ? '#3b82f6' : 'white',
+              color: filter === key ? 'white' : '#6b7280',
+              border: '1px solid #e5e7eb',
+              borderRadius: '0.375rem',
+              padding: '0.5rem 0.75rem',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem'
+            }}
+          >
+            {label} ({count})
+          </button>
+        ))}
+      </div>
 
       {/* Add new item */}
       <div style={{ 
@@ -118,29 +138,34 @@ export default function GroceryList({ initialItems, onUpdate }: GroceryListProps
             }}
             onKeyPress={(e) => e.key === 'Enter' && addItem()}
           />
-          <input
-            type="text"
+          <select
             value={newCategory}
             onChange={(e) => setNewCategory(e.target.value)}
-            placeholder="Category"
             style={{
-              width: '120px',
               padding: '0.5rem',
               border: '1px solid #d1d5db',
               borderRadius: '0.375rem',
-              fontSize: '0.875rem'
+              fontSize: '0.875rem',
+              minWidth: '120px'
             }}
-          />
+          >
+            <option value="">Category</option>
+            {categories.map(cat => (
+              <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
+            ))}
+          </select>
           <button
             onClick={addItem}
+            disabled={!newItem.trim()}
             style={{
-              backgroundColor: '#3b82f6',
+              backgroundColor: newItem.trim() ? '#10b981' : '#9ca3af',
               color: 'white',
               border: 'none',
               borderRadius: '0.375rem',
               padding: '0.5rem 1rem',
               fontSize: '0.875rem',
-              cursor: 'pointer'
+              fontWeight: '500',
+              cursor: newItem.trim() ? 'pointer' : 'not-allowed'
             }}
           >
             Add
@@ -148,122 +173,136 @@ export default function GroceryList({ initialItems, onUpdate }: GroceryListProps
         </div>
       </div>
 
-      {/* Filter buttons */}
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-        {['all', 'high', 'medium', 'low'].map((priority) => (
-          <button
-            key={priority}
-            onClick={() => setFilter(priority as any)}
-            style={{
-              backgroundColor: filter === priority ? '#3b82f6' : '#f3f4f6',
-              color: filter === priority ? 'white' : '#374151',
-              border: 'none',
-              borderRadius: '0.375rem',
-              padding: '0.5rem 1rem',
-              fontSize: '0.875rem',
-              cursor: 'pointer',
-              textTransform: 'capitalize'
-            }}
-          >
-            {priority} ({items.filter(item => priority === 'all' || item.priority === priority).length})
-          </button>
-        ))}
-      </div>
-
-      {/* Grocery items */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        {filteredItems.map((item, index) => (
-          <div
-            key={index}
-            style={{
-              backgroundColor: 'white',
-              padding: '1rem',
-              borderRadius: '0.5rem',
-              border: '1px solid #e5e7eb',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '1rem',
-              opacity: item.checked ? 0.6 : 1
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={item.checked}
-              onChange={() => toggleItem(index)}
-              style={{ width: '1.25rem', height: '1.25rem' }}
-            />
-            
-            <div style={{ flex: 1 }}>
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '0.5rem',
-                marginBottom: '0.25rem'
-              }}>
-                <span style={{ 
-                  fontSize: '1rem', 
-                  fontWeight: '500',
-                  textDecoration: item.checked ? 'line-through' : 'none'
-                }}>
-                  {item.item}
-                </span>
-                <span
-                  style={{
-                    backgroundColor: getPriorityColor(item.priority),
-                    color: 'white',
-                    padding: '0.125rem 0.5rem',
-                    borderRadius: '0.25rem',
-                    fontSize: '0.75rem',
-                    fontWeight: '500'
-                  }}
-                >
-                  {item.priority}
-                </span>
-                <span
-                  style={{
-                    backgroundColor: getCategoryColor(item.category),
-                    color: '#374151',
-                    padding: '0.125rem 0.5rem',
-                    borderRadius: '0.25rem',
-                    fontSize: '0.75rem'
-                  }}
-                >
-                  {item.category}
-                </span>
-              </div>
-              <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                Needed for: {item.needed_for}
-              </div>
-            </div>
-
-            <button
-              onClick={() => removeItem(index)}
+      {/* Items list */}
+      {filteredItems.length === 0 ? (
+        <div style={{
+          textAlign: 'center',
+          padding: '3rem 1rem',
+          color: '#6b7280'
+        }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🛒</div>
+          <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#374151', marginBottom: '0.5rem' }}>
+            {filter === 'all' ? 'Your grocery list is empty' : `No ${filter} priority items`}
+          </h3>
+          <p style={{ fontSize: '0.875rem' }}>
+            {filter === 'all' ? 'Add items to get started with your grocery list.' : 'Try a different filter or add some items.'}
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: '0.75rem' }}>
+          {filteredItems.map((item, index) => (
+            <div
+              key={index}
               style={{
-                backgroundColor: '#ef4444',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.375rem',
-                padding: '0.25rem 0.5rem',
-                fontSize: '0.75rem',
-                cursor: 'pointer'
+                backgroundColor: 'white',
+                border: '1px solid #e5e7eb',
+                borderRadius: '0.5rem',
+                padding: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '1rem',
+                opacity: item.checked ? 0.6 : 1,
+                textDecoration: item.checked ? 'line-through' : 'none'
               }}
             >
-              Remove
-            </button>
-          </div>
-        ))}
-      </div>
-
-      {filteredItems.length === 0 && (
-        <div style={{ 
-          textAlign: 'center', 
-          padding: '2rem', 
-          color: '#6b7280',
-          backgroundColor: 'white',
-          borderRadius: '0.5rem',
-          border: '1px solid #e5e7eb'
-        }}>
-          No items found. Add some items to your grocery list!
+              <input
+                type="checkbox"
+                checked={item.checked}
+                onChange={() => toggleChecked(index)}
+                style={{
+                  width: '1.25rem',
+                  height: '1.25rem',
+                  cursor: 'pointer'
+                }}
+              />
+              
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                  <input
+                    type="text"
+                    value={item.item}
+                    onChange={(e) => updateItem(index, 'item', e.target.value)}
+                    style={{
+                      fontSize: '1rem',
+                      fontWeight: '600',
+                      color: '#1f2937',
+                      border: 'none',
+                      background: 'transparent',
+                      padding: '0.25rem',
+                      borderRadius: '0.25rem',
+                      minWidth: '100px'
+                    }}
+                  />
+                  <span style={{
+                    fontSize: '0.75rem',
+                    color: '#6b7280',
+                    backgroundColor: '#f3f4f6',
+                    padding: '0.125rem 0.5rem',
+                    borderRadius: '0.25rem'
+                  }}>
+                    {item.category}
+                  </span>
+                  <select
+                    value={item.priority}
+                    onChange={(e) => updateItem(index, 'priority', e.target.value)}
+                    style={{
+                      fontSize: '0.75rem',
+                      border: 'none',
+                      background: 'transparent',
+                      color: item.priority === 'high' ? '#ef4444' : item.priority === 'medium' ? '#f59e0b' : '#10b981',
+                      fontWeight: '500'
+                    }}
+                  >
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                  </select>
+                </div>
+                
+                <div style={{ fontSize: '0.875rem', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span>Needed for: {item.needed_for}</span>
+                  <span>•</span>
+                  <a
+                    href={generateAmazonSearchUrl(item.item)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      color: '#3b82f6',
+                      textDecoration: 'none',
+                      fontSize: '0.875rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem'
+                    }}
+                    title={`Search for ${item.item} on Amazon`}
+                  >
+                    🛒 Search Amazon
+                  </a>
+                </div>
+              </div>
+              
+              <button
+                onClick={() => removeItem(index)}
+                style={{
+                  backgroundColor: '#ef4444',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.375rem',
+                  padding: '0.5rem',
+                  fontSize: '0.875rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: '2rem',
+                  height: '2rem'
+                }}
+                title="Remove item"
+              >
+                🗑️
+              </button>
+            </div>
+          ))}
         </div>
       )}
     </div>

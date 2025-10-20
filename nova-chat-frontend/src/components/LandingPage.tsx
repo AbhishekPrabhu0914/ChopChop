@@ -2,15 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { authService } from '../lib/auth';
+import AuthModal from './AuthModal';
 
 interface LandingPageProps {
   onEnterApp: (email: string) => void;
 }
 
 const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
-  const [email, setEmail] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   useEffect(() => {
@@ -30,29 +29,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
     checkExistingAuth();
   }, [onEnterApp]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim()) {
-      setError('Please enter your email address');
-      return;
-    }
+  const handleGetStarted = () => {
+    setIsAuthModalOpen(true);
+  };
 
-    setIsLoading(true);
-    setError('');
-
-    try {
-      const response = await authService.signIn(email.trim());
-      
-      if (response.success) {
-        onEnterApp(response.email!);
-      } else {
-        setError(response.error || response.message || 'Sign in failed');
-      }
-    } catch (error) {
-      setError('An unexpected error occurred');
-    } finally {
-      setIsLoading(false);
-    }
+  const handleAuthSuccess = (email: string) => {
+    setIsAuthModalOpen(false);
+    onEnterApp(email);
   };
 
   if (isCheckingAuth) {
@@ -77,10 +60,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      justifyContent: 'center',
-      height: '100vh',
+      justifyContent: 'flex-start',
+      minHeight: '100vh',
       backgroundColor: '#f9fafb',
-      padding: '2rem',
+      padding: '4rem 2rem 2rem 2rem',
     }}>
       {/* Hero Section */}
       <div style={{
@@ -192,76 +175,26 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
           textAlign: 'center',
           fontSize: '0.875rem',
         }}>
-          Enter your email to start using ChopChop
+          Sign in or create an account to start using ChopChop
         </p>
 
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '1rem' }}>
-            <label htmlFor="email" style={{
-              display: 'block',
-              fontSize: '0.875rem',
-              fontWeight: '500',
-              color: '#374151',
-              marginBottom: '0.5rem',
-            }}>
-              Email Address
-            </label>
-            <input
-              type="email"
-              id="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="your@email.com"
-              disabled={isLoading}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.5rem',
-                fontSize: '1rem',
-                outline: 'none',
-                transition: 'border-color 0.2s',
-                backgroundColor: isLoading ? '#f9fafb' : 'white',
-                boxSizing: 'border-box',
-              }}
-              onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
-              onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
-            />
-          </div>
-
-          {error && (
-            <div style={{
-              backgroundColor: '#fef2f2',
-              border: '1px solid #fecaca',
-              color: '#dc2626',
-              padding: '0.75rem',
-              borderRadius: '0.5rem',
-              marginBottom: '1rem',
-              fontSize: '0.875rem',
-            }}>
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={isLoading || !email.trim()}
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              border: 'none',
-              borderRadius: '0.5rem',
-              backgroundColor: isLoading || !email.trim() ? '#9ca3af' : '#3b82f6',
-              color: 'white',
-              fontSize: '1rem',
-              fontWeight: '500',
-              cursor: isLoading || !email.trim() ? 'not-allowed' : 'pointer',
-              transition: 'background-color 0.2s',
-            }}
-          >
-            {isLoading ? 'Signing In...' : 'Enter ChopChop'}
-          </button>
-        </form>
+        <button
+          onClick={handleGetStarted}
+          style={{
+            width: '100%',
+            padding: '0.75rem',
+            border: 'none',
+            borderRadius: '0.5rem',
+            backgroundColor: '#3b82f6',
+            color: 'white',
+            fontSize: '1rem',
+            fontWeight: '500',
+            cursor: 'pointer',
+            transition: 'background-color 0.2s',
+          }}
+        >
+          Get Started
+        </button>
       </div>
 
       {/* Footer */}
@@ -273,6 +206,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
       }}>
         <p>Powered by Amazon Bedrock • Built with Next.js & React</p>
       </div>
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={handleAuthSuccess}
+      />
     </div>
   );
 };

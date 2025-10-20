@@ -57,8 +57,8 @@ def main():
     print("Amazon Nova Lite Chat Script")
     print("=" * 30)
     
-    # Example message
-    user_message = "Describe the purpose of a 'hello world' program in one line."
+    # Example message - asking for Amazon URL for bananas
+    user_message = "Can you provide me with a valid Amazon.com URL where I can buy bananas? Please give me a real, working Amazon product page URL for bananas."
     print(f"User: {user_message}")
     
     # Get response from Nova

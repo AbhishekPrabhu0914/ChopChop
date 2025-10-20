@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import GroceryList from './GroceryList';
 import Recipes from './Recipes';
+import Pantry from './Pantry';
 import { SupabaseService } from '../lib/supabase';
 import { authService } from '../lib/auth';
 
@@ -43,22 +44,27 @@ interface Recipe {
   tips: string;
 }
 
+interface PantryItem {
+  name: string;
+  quantity: string;
+  category: string;
+  freshness: 'fresh' | 'good' | 'needs_use_soon' | 'expired';
+  detected_at: string;
+}
+
 export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isFridgeMode, setIsFridgeMode] = useState(false);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'chat' | 'grocery' | 'recipes'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'grocery' | 'recipes' | 'pantry'>('chat');
   const [groceryItems, setGroceryItems] = useState<GroceryItem[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
   const [userEmail, setUserEmail] = useState<string>('');
-  const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isLoadingData, setIsLoadingData] = useState<boolean>(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -83,7 +89,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
     }
   }, [isInitialized]);
 
-  // Load user data automatically on component mount
+  // Load user data and chat history automatically on component mount
   useEffect(() => {
     const loadUserData = async () => {
       if (authService.isAuthenticated()) {
@@ -95,7 +101,8 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
           const sessionId = authService.getSessionId();
           if (sessionId) {
             try {
-              const response = await fetch('http://localhost:8000/get-data', {
+              // First validate the session with the backend
+              const verifyResponse = await fetch('http://localhost:8000/auth/verify', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -105,15 +112,75 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
                 }),
               });
 
-              const data = await response.json();
+              const verifyResult = await verifyResponse.json();
+              
+              if (!verifyResult.success) {
+                // Session is invalid, sign out the user and show sign-in prompt
+                console.log('Session expired, signing out user');
+                authService.signOut();
+                setUserEmail('');
+                // The App component will handle showing the landing page
+                return;
+              }
+              
+              // Load grocery items and recipes
+              const dataResponse = await fetch('/api/get-data', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  session_id: sessionId
+                }),
+              });
 
-              if (data.success && data.data) {
-                if (data.data.items && data.data.items.length > 0) {
-                  setGroceryItems(data.data.items);
+              const dataResult = await dataResponse.json();
+
+              if (dataResult.success && dataResult.data) {
+                if (dataResult.data.items && dataResult.data.items.length > 0) {
+                  setGroceryItems(dataResult.data.items);
+                  // Also populate pantry from the same items data
+                  const pantryItemsFromGrocery: PantryItem[] = dataResult.data.items.map((item: any) => ({
+                    name: item.item || item.name || 'Unknown item',
+                    quantity: item.quantity || 'Unknown quantity',
+                    category: item.category || 'other',
+                    freshness: item.freshness || 'good',
+                    detected_at: item.detected_at || new Date().toISOString()
+                  }));
+                  setPantryItems(pantryItemsFromGrocery);
                 }
-                if (data.data.recipes && data.data.recipes.length > 0) {
-                  setRecipes(data.data.recipes);
+                if (dataResult.data.recipes && dataResult.data.recipes.length > 0) {
+                  setRecipes(dataResult.data.recipes);
                 }
+              }
+
+              // Load chat history
+              const chatResponse = await fetch('/api/chat-history', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  session_id: sessionId
+                }),
+              });
+
+              const chatResult = await chatResponse.json();
+
+              if (chatResult.success && chatResult.chat_history && chatResult.chat_history.length > 0) {
+                // Convert chat history to Message format
+                const chatMessages: Message[] = chatResult.chat_history.map((msg: any, index: number) => ({
+                  id: `loaded-${index}-${Date.now()}`,
+                  text: msg.message,
+                  sender: msg.sender as 'user' | 'nova',
+                  timestamp: new Date(msg.timestamp || Date.now()),
+                  hasImage: !!msg.image_data,
+                  imageUrl: msg.image_data ? `data:image/${msg.image_format || 'jpeg'};base64,${msg.image_data}` : undefined,
+                  structuredData: msg.sender === 'nova' && msg.message.includes('{') ? JSON.parse(msg.message) : undefined
+                }));
+
+                // Replace the initial welcome message with loaded chat history
+                setMessages(chatMessages);
               }
             } catch (error) {
               console.error('Error loading user data:', error);
@@ -127,21 +194,33 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
     loadUserData();
   }, []);
 
-  // Auto-save data when grocery items or recipes change
+  // Auto-save data when grocery items, recipes, or pantry items change
   useEffect(() => {
     if (!isLoadingData && authService.isAuthenticated()) {
       const autoSave = async () => {
         const sessionId = authService.getSessionId();
-        if (sessionId && (groceryItems.length > 0 || recipes.length > 0)) {
+        if (sessionId && (groceryItems.length > 0 || recipes.length > 0 || pantryItems.length > 0)) {
           try {
-            await fetch('http://localhost:8000/save-data', {
+            // Convert pantry items back to grocery items format for saving
+            const updatedGroceryItems = pantryItems.map(pantryItem => ({
+              item: pantryItem.name,
+              category: pantryItem.category,
+              needed_for: 'pantry',
+              priority: 'medium' as const,
+              checked: false,
+              quantity: pantryItem.quantity,
+              freshness: pantryItem.freshness,
+              detected_at: pantryItem.detected_at
+            }));
+            
+            await fetch('/api/save-data', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
                 session_id: sessionId,
-                items: groceryItems,
+                items: updatedGroceryItems,
                 recipes: recipes,
               }),
             });
@@ -155,40 +234,8 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
       const timeoutId = setTimeout(autoSave, 2000);
       return () => clearTimeout(timeoutId);
     }
-  }, [groceryItems, recipes, isLoadingData]);
+  }, [groceryItems, recipes, pantryItems, isLoadingData]);
 
-  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      // Check file size (limit to 100MB)
-      if (file.size > 100 * 1024 * 1024) {
-        alert('Image too large. Maximum supported size is 100MB. Please compress or resize your image.');
-        return;
-      }
-      
-      // Check file format
-      const supportedFormats = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-      if (!supportedFormats.includes(file.type.toLowerCase())) {
-        alert('Unsupported image format. Please use JPEG, PNG, GIF, or WebP images.');
-        return;
-      }
-      
-      setSelectedImage(file);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const removeImage = () => {
-    setSelectedImage(null);
-    setImagePreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
 
   const uploadFridgePhoto = async (file: File) => {
     console.log('Starting fridge photo upload:', file.name, file.type, file.size);
@@ -207,9 +254,8 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
     }
     
     setIsFridgeMode(true);
-    setSelectedImage(file);
     
-    // Create image preview for user message and set in state
+    // Create image preview for user message
     const imagePreviewUrl = await new Promise<string>((resolve) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);
@@ -217,8 +263,6 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
     });
 
     console.log('Image preview created, length:', imagePreviewUrl.length);
-    // Set the image preview in state
-    setImagePreview(imagePreviewUrl);
 
     // Add user message showing the uploaded fridge photo
     const userMessage: Message = {
@@ -244,15 +288,16 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
       });
 
       console.log('Sending request to backend with imageBase64 length:', imageBase64.length);
-      const response = await fetch('/api/chat', {
+      const sessionId = authService.getSessionId();
+      const response = await fetch('/api/upload-fridge', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: "Analyze this fridge photo and suggest recipes based on the ingredients you can see. List the ingredients first, then provide 2-3 recipe suggestions with cooking instructions.",
           imageBase64,
-          imageFormat: file.type.split('/')[1]
+          imageFormat: file.type.split('/')[1],
+          session_id: sessionId
         }),
       });
 
@@ -267,20 +312,38 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
         if (data.response && typeof data.response === 'object' && data.response.type === 'structured') {
           const structuredData = data.response.data;
           
-          // Update grocery list and recipes
+          // Update grocery list, recipes, and pantry
           if (structuredData.grocery_list) {
             setGroceryItems(structuredData.grocery_list);
           }
           if (structuredData.recipes) {
             setRecipes(structuredData.recipes);
           }
+          if (structuredData.ingredients) {
+            // Convert detected ingredients to pantry items
+            const pantryItemsFromIngredients: PantryItem[] = structuredData.ingredients.map((ingredient: any) => ({
+              name: ingredient.name || 'Unknown ingredient',
+              quantity: ingredient.quantity || 'Unknown quantity',
+              category: ingredient.category || 'other',
+              freshness: ingredient.freshness || 'good',
+              detected_at: new Date().toISOString()
+            }));
+            setPantryItems(prev => {
+              // Merge with existing pantry items, avoiding duplicates
+              const existingNames = prev.map(item => item.name.toLowerCase());
+              const newItems = pantryItemsFromIngredients.filter(item => 
+                !existingNames.includes(item.name.toLowerCase())
+              );
+              return [...prev, ...newItems];
+            });
+          }
           
-          // Switch to grocery tab if we have structured data
-          setActiveTab('grocery');
+          // Switch to pantry tab to show detected ingredients
+          setActiveTab('pantry');
           
           const novaMessage: Message = {
             id: `nova-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            text: `I've analyzed your fridge! I found ${structuredData.ingredients?.length || 0} ingredients and created ${structuredData.recipes?.length || 0} recipes for you. Check out the Grocery List and Recipes tabs!`,
+            text: `I've analyzed your fridge! I found ${structuredData.ingredients?.length || 0} ingredients and created ${structuredData.recipes?.length || 0} recipes for you. Check out the Pantry, Grocery List, and Recipes tabs!`,
             sender: 'nova',
             timestamp: new Date(),
             structuredData: structuredData
@@ -312,20 +375,17 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
     } finally {
       setIsLoading(false);
       setIsFridgeMode(false);
-      removeImage();
     }
   };
 
   const sendMessage = async () => {
-    if (!inputMessage.trim() && !selectedImage) return;
+    if (!inputMessage.trim()) return;
 
     const userMessage: Message = {
       id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       text: inputMessage,
       sender: 'user',
-      timestamp: new Date(),
-      hasImage: !!selectedImage,
-      imageUrl: imagePreview || undefined
+      timestamp: new Date()
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -333,22 +393,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
     setIsLoading(true);
 
     try {
-      let imageBase64 = null;
-      let imageFormat = null;
-
-      if (selectedImage) {
-        imageBase64 = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const result = reader.result as string;
-            // Remove data:image/jpeg;base64, prefix
-            resolve(result.split(',')[1]);
-          };
-          reader.readAsDataURL(selectedImage);
-        });
-        imageFormat = selectedImage.type.split('/')[1];
-      }
-
+      const sessionId = authService.getSessionId();
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -356,8 +401,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
         },
         body: JSON.stringify({
           message: inputMessage,
-          imageBase64,
-          imageFormat
+          session_id: sessionId
         }),
       });
 
@@ -390,7 +434,6 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
-      removeImage();
     }
   };
 
@@ -408,88 +451,6 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
     onSignOut();
   };
 
-  const saveToSupabase = async () => {
-    const sessionId = authService.getSessionId();
-    if (!sessionId) {
-      alert('Session expired. Please sign in again.');
-      onSignOut();
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      const response = await fetch('http://localhost:8000/save-data', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          session_id: sessionId,
-          items: groceryItems,
-          recipes: recipes
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        alert('Data saved successfully!');
-      } else {
-        if (response.status === 503) {
-          alert('Supabase is not configured. Please set up Supabase to enable data saving. See SUPABASE_SETUP.md for instructions.');
-        } else {
-          alert('Failed to save data. Please try again.');
-        }
-      }
-    } catch (error) {
-      console.error('Error saving to Supabase:', error);
-      alert('Error saving data. Please try again.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const loadFromSupabase = async () => {
-    const sessionId = authService.getSessionId();
-    if (!sessionId) {
-      alert('Session expired. Please sign in again.');
-      onSignOut();
-      return;
-    }
-
-    try {
-      const response = await fetch('http://localhost:8000/get-data', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          session_id: sessionId
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        if (data.data && (data.data.items.length > 0 || data.data.recipes.length > 0)) {
-          setGroceryItems(data.data.items);
-          setRecipes(data.data.recipes);
-          alert('Data loaded successfully!');
-        } else {
-          alert('No saved data found for this email.');
-        }
-      } else {
-        if (response.status === 503) {
-          alert('Supabase is not configured. Please set up Supabase to enable data loading. See SUPABASE_SETUP.md for instructions.');
-        } else {
-          alert('Failed to load data. Please try again.');
-        }
-      }
-    } catch (error) {
-      console.error('Error loading from Supabase:', error);
-      alert('Error loading data. Please try again.');
-    }
-  };
 
   const sendEmail = async () => {
     const sessionId = authService.getSessionId();
@@ -500,7 +461,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
     }
 
     try {
-      const response = await fetch('http://localhost:8000/send-email', {
+      const response = await fetch('/api/send-email', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -600,46 +561,6 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
             </button>
             
             <button
-              onClick={saveToSupabase}
-              disabled={isSaving || (groceryItems.length === 0 && recipes.length === 0)}
-              style={{
-                backgroundColor: '#10b981',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.5rem',
-                padding: '0.75rem 1rem',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                cursor: (isSaving || (groceryItems.length === 0 && recipes.length === 0)) ? 'not-allowed' : 'pointer',
-                opacity: (isSaving || (groceryItems.length === 0 && recipes.length === 0)) ? 0.6 : 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}
-            >
-              {isSaving ? '⏳' : '💾'} Save Data
-            </button>
-            
-            <button
-              onClick={loadFromSupabase}
-              style={{
-                backgroundColor: '#3b82f6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.5rem',
-                padding: '0.75rem 1rem',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}
-            >
-              📥 Load Data
-            </button>
-            
-            <button
               onClick={sendEmail}
               disabled={groceryItems.length === 0 && recipes.length === 0}
               style={{
@@ -687,6 +608,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
         <div style={{ display: 'flex', padding: '0 1rem' }}>
           {[
             { id: 'chat', label: '💬 Chat', icon: '💬' },
+            { id: 'pantry', label: '🏠 Pantry', icon: '🏠' },
             { id: 'grocery', label: '🛒 Grocery List', icon: '🛒' },
             { id: 'recipes', label: '👨‍🍳 Recipes', icon: '👨‍🍳' }
           ].map((tab) => (
@@ -773,10 +695,18 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
           </div>
         )}
 
+        {activeTab === 'pantry' && (
+          <Pantry 
+            initialItems={pantryItems} 
+            onUpdate={setPantryItems}
+            onRecipesGenerated={setRecipes}
+          />
+        )}
+
         {activeTab === 'grocery' && (
           <GroceryList 
             initialItems={groceryItems} 
-            onUpdate={setGroceryItems} 
+            onUpdate={setGroceryItems}
           />
         )}
 
@@ -785,85 +715,50 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
         )}
       </div>
 
-      {/* Image Preview - only show in chat tab */}
-      {activeTab === 'chat' && imagePreview && (
-        <div style={{ padding: '0.5rem 1rem', backgroundColor: '#f3f4f6', borderTop: '1px solid #e5e7eb' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <img
-              src={imagePreview}
-              alt="Preview"
-              style={{ height: '4rem', width: '4rem', objectFit: 'cover', borderRadius: '0.375rem' }}
-            />
-            <div style={{ flex: 1 }}>
-              <p style={{ margin: 0, fontSize: '0.875rem', color: '#6b7280' }}>Image selected</p>
-              <p style={{ margin: 0, fontSize: '0.75rem', color: '#9ca3af' }}>{selectedImage?.name}</p>
-            </div>
-            <button
-              onClick={removeImage}
-              style={{ color: '#dc2626', fontSize: '0.875rem', background: 'none', border: 'none', cursor: 'pointer' }}
-            >
-              Remove
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Input - only show in chat tab */}
       {activeTab === 'chat' && (
         <div style={{ backgroundColor: 'white', borderTop: '1px solid #e5e7eb', padding: '1rem' }}>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleImageSelect}
-              accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-              style={{ display: 'none' }}
-            />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            style={{ padding: '0.5rem', color: '#6b7280', background: 'none', border: 'none', borderRadius: '0.375rem', cursor: 'pointer' }}
-            title="Upload image"
-          >
-            📷
-          </button>
-          
-          <div style={{ flex: 1, position: 'relative' }}>
-            <textarea
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Type your message... (Shift+Enter for new line)"
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div style={{ flex: 1, position: 'relative' }}>
+              <textarea
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Type your message... (Shift+Enter for new line)"
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.5rem',
+                  resize: 'none',
+                  outline: 'none',
+                  minHeight: '2.5rem',
+                  maxHeight: '7.5rem',
+                  fontFamily: 'inherit',
+                  fontSize: '1rem'
+                }}
+                rows={1}
+              />
+            </div>
+            
+            <button
+              onClick={sendMessage}
+              disabled={isLoading || !inputMessage.trim()}
               style={{
-                width: '100%',
-                padding: '0.5rem 0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.375rem',
-                resize: 'none',
-                outline: 'none',
-                minHeight: '2.5rem',
-                maxHeight: '7.5rem',
-                fontFamily: 'inherit'
+                padding: '0.75rem 1.5rem',
+                backgroundColor: '#2563eb',
+                color: 'white',
+                borderRadius: '0.5rem',
+                border: 'none',
+                cursor: isLoading || !inputMessage.trim() ? 'not-allowed' : 'pointer',
+                opacity: isLoading || !inputMessage.trim() ? 0.5 : 1,
+                fontSize: '1rem',
+                fontWeight: '500'
               }}
-              rows={1}
-            />
+            >
+              {isLoading ? '⏳' : '📤 Send'}
+            </button>
           </div>
-          
-          <button
-            onClick={sendMessage}
-            disabled={isLoading || (!inputMessage.trim() && !selectedImage)}
-            style={{
-              padding: '0.5rem',
-              backgroundColor: '#2563eb',
-              color: 'white',
-              borderRadius: '0.375rem',
-              border: 'none',
-              cursor: isLoading || (!inputMessage.trim() && !selectedImage) ? 'not-allowed' : 'pointer',
-              opacity: isLoading || (!inputMessage.trim() && !selectedImage) ? 0.5 : 1
-            }}
-          >
-            {isLoading ? '⏳' : '📤'}
-          </button>
-        </div>
         </div>
       )}
 

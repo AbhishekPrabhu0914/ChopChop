@@ -416,6 +416,125 @@ class SupabaseManager:
         """
         
         return html
+    
+    def save_chat_message(self, user_email: str, message: str, sender: str, image_base64: str = None, image_format: str = None) -> bool:
+        """
+        Save a chat message to the database
+        
+        Args:
+            user_email: User's email address
+            message: The message content
+            sender: 'user' or 'nova'
+            image_base64: Base64 encoded image (optional)
+            image_format: Image format (optional)
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.enabled:
+            logger.warning("Supabase is not enabled. Cannot save chat message.")
+            return False
+            
+        try:
+            # Check if chat_history column exists by trying to update it
+            try:
+                # First get existing user data
+                result = self.supabase.table('Users').select('*').eq('email', user_email).execute()
+                
+                if result.data:
+                    # Update existing user with chat message
+                    user_record = result.data[0]
+                    chat_history = json.loads(user_record.get('chat_history', '[]'))
+                    
+                    # Add new message to chat history
+                    chat_history.append({
+                        'message': message,
+                        'sender': sender,
+                        'timestamp': 'now()',
+                        'image_data': image_base64,
+                        'image_format': image_format
+                    })
+                    
+                    # Keep only last 100 messages to prevent database bloat
+                    chat_history = chat_history[-100:]
+                    
+                    update_data = {
+                        'chat_history': json.dumps(chat_history)
+                    }
+                    
+                    self.supabase.table('Users').update(update_data).eq('email', user_email).execute()
+                else:
+                    # Create new user record with chat message
+                    chat_history = [{
+                        'message': message,
+                        'sender': sender,
+                        'timestamp': 'now()',
+                        'image_data': image_base64,
+                        'image_format': image_format
+                    }]
+                    
+                    new_user_data = {
+                        'email': user_email,
+                        'items': '[]',
+                        'recipes': '[]',
+                        'recent_recipes': '[]',
+                        'chat_history': json.dumps(chat_history)
+                    }
+                    
+                    self.supabase.table('Users').insert(new_user_data).execute()
+                
+                logger.info(f"Saved chat message for user {user_email}")
+                return True
+                
+            except Exception as column_error:
+                if 'column' in str(column_error).lower() and 'does not exist' in str(column_error).lower():
+                    logger.warning("chat_history column doesn't exist, chat message not saved")
+                    return False
+                else:
+                    raise column_error
+            
+        except Exception as e:
+            logger.error(f"Error saving chat message: {e}")
+            return False
+    
+    def get_chat_history(self, user_email: str) -> Optional[List[Dict]]:
+        """
+        Get user's chat history
+        
+        Args:
+            user_email: User's email address
+            
+        Returns:
+            List of chat messages or None if error
+        """
+        if not self.enabled:
+            logger.warning("Supabase is not enabled. Cannot retrieve chat history.")
+            return None
+            
+        try:
+            # Try to get chat_history column, fall back to all columns if it doesn't exist
+            try:
+                result = self.supabase.table('Users').select('chat_history').eq('email', user_email).execute()
+            except Exception as column_error:
+                if 'column' in str(column_error).lower() and 'does not exist' in str(column_error).lower():
+                    logger.warning("chat_history column doesn't exist, returning empty chat history")
+                    return []
+                else:
+                    raise column_error
+            
+            if result.data and len(result.data) > 0:
+                chat_history_raw = result.data[0].get('chat_history')
+                if chat_history_raw:
+                    chat_history = json.loads(chat_history_raw)
+                    return chat_history
+                else:
+                    return []
+            else:
+                return []
+                
+        except Exception as e:
+            logger.error(f"Error retrieving chat history: {e}")
+            return None
 
 # Global instance
 supabase_manager = SupabaseManager()
