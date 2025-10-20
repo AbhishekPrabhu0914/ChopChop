@@ -266,7 +266,9 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
 
       console.log('Sending request to backend with imageBase64 length:', imageBase64.length);
       const user = authService.getCurrentUser();
-      const response = await fetch('/api/upload-fridge', {
+      const apiUrl = `${window.location.origin}/api/upload-fridge`;
+      console.log('Calling upload API at', apiUrl);
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -389,9 +391,11 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
       const data = await response.json();
 
       if (data.success) {
+        // Normalize response: if backend returned an object (structured), stringify it for display
+        const responseText = typeof data.response === 'string' ? data.response : JSON.stringify(data.response, null, 2);
         const novaMessage: Message = {
           id: `nova-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          text: data.response,
+          text: responseText,
           sender: 'nova',
           timestamp: new Date()
         };
@@ -414,7 +418,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
@@ -429,43 +433,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
   };
 
 
-  const sendEmail = async () => {
-    const user = authService.getCurrentUser();
-    if (!user) {
-      alert('Session expired. Please sign in again.');
-      onSignOut();
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/send-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: user?.email,
-          items: groceryItems,
-          recipes: recipes
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        alert('Email sent successfully!');
-      } else {
-        if (response.status === 503) {
-          alert('Supabase is not configured. Please set up Supabase to enable email sending. See SUPABASE_SETUP.md for instructions.');
-        } else {
-          alert('Failed to send email. Please try again.');
-        }
-      }
-    } catch (error) {
-      console.error('Error sending email:', error);
-      alert('Error sending email. Please try again.');
-    }
-  };
+  
 
 
   // Show loading screen while loading user data
@@ -493,7 +461,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1f2937', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              🚀 ChopChop Chat
+              ChopChop Chat
             </h1>
             <p style={{ color: '#6b7280', fontSize: '0.875rem', margin: '0.25rem 0 0 0' }}>
               Powered by Amazon Bedrock
@@ -505,58 +473,9 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
             </p>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <button
-              onClick={() => {
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = 'image/jpeg,image/jpg,image/png,image/gif,image/webp';
-                input.onchange = (e) => {
-                  const file = (e.target as HTMLInputElement).files?.[0];
-                  if (file) {
-                    uploadFridgePhoto(file);
-                  }
-                };
-                input.click();
-              }}
-              disabled={isLoading}
-              style={{
-                backgroundColor: '#f59e0b',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.5rem',
-                padding: '0.75rem 1rem',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                cursor: isLoading ? 'not-allowed' : 'pointer',
-                opacity: isLoading ? 0.6 : 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}
-            >
-              {isLoading ? '⏳' : '📸'} Upload Fridge Photo
-            </button>
+            {/* upload button moved to chat input area */}
             
-            <button
-              onClick={sendEmail}
-              disabled={groceryItems.length === 0 && recipes.length === 0}
-              style={{
-                backgroundColor: '#8b5cf6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.5rem',
-                padding: '0.75rem 1rem',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                cursor: (groceryItems.length === 0 && recipes.length === 0) ? 'not-allowed' : 'pointer',
-                opacity: (groceryItems.length === 0 && recipes.length === 0) ? 0.6 : 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}
-            >
-              📧 Send Email
-            </button>
+            
 
             <button
               onClick={handleSignOut}
@@ -584,10 +503,10 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
       <div style={{ backgroundColor: 'white', borderBottom: '1px solid #e5e7eb' }}>
         <div style={{ display: 'flex', padding: '0 1rem' }}>
           {[
-            { id: 'chat', label: '💬 Chat', icon: '💬' },
-            { id: 'pantry', label: '🏠 Pantry', icon: '🏠' },
-            { id: 'grocery', label: '🛒 Grocery List', icon: '🛒' },
-            { id: 'recipes', label: '👨‍🍳 Recipes', icon: '👨‍🍳' }
+            { id: 'chat', label: 'Chat', icon: '💬' },
+            { id: 'pantry', label: 'Pantry', icon: '🏠' },
+            { id: 'grocery', label: 'Grocery List', icon: '🛒' },
+            { id: 'recipes', label: 'Recipes', icon: '👨‍🍳' }
           ].map((tab) => (
             <button
               key={tab.id}
@@ -606,7 +525,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
                 gap: '0.5rem'
               }}
             >
-              {tab.icon} {tab.label}
+              {tab.label} {tab.icon}
             </button>
           ))}
         </div>
@@ -703,7 +622,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
               <textarea
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onKeyDown={handleKeyDown}
                 placeholder="Type your message... (Shift+Enter for new line)"
                 style={{
                   width: '100%',
@@ -737,6 +656,40 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
               }}
             >
               {isLoading ? '⏳' : '📤 Send'}
+            </button>
+
+            {/* Compact upload button placed next to Send */}
+            <button
+              onClick={() => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/jpeg,image/jpg,image/png,image/gif,image/webp';
+                input.onchange = (e) => {
+                  const file = (e.target as HTMLInputElement).files?.[0];
+                  if (file) {
+                    uploadFridgePhoto(file);
+                  }
+                };
+                input.click();
+              }}
+              title="Upload Fridge Photo"
+              aria-label="Upload Fridge Photo"
+              disabled={isLoading}
+              style={{
+                padding: '0.5rem 0.75rem',
+                backgroundColor: '#f59e0b',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.5rem',
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                opacity: isLoading ? 0.6 : 1,
+                fontSize: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              {isLoading ? '⏳' : 'Upload Image 📸'}
             </button>
           </div>
         </div>
