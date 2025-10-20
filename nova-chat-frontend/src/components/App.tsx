@@ -7,7 +7,6 @@ import { authService } from '../lib/auth';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userEmail, setUserEmail] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {

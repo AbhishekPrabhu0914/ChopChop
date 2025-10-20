@@ -39,13 +39,13 @@ export async function POST(request: NextRequest) {
       response: data.response
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error calling Python backend:', error);
     
     return NextResponse.json(
       { 
         error: 'Failed to get response from Nova model',
-        details: error.message 
+        details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
     );

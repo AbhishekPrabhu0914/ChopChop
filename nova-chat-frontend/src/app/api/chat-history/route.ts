@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       chat_history: data.chat_history
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error calling Python backend for chat-history:', error);
     
     return NextResponse.json(

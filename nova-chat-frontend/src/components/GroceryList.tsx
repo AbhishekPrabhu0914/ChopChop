@@ -92,7 +92,7 @@ export default function GroceryList({ initialItems, onUpdate }: GroceryListProps
         ].map(({ key, label, count }) => (
           <button
             key={key}
-            onClick={() => setFilter(key as any)}
+            onClick={() => setFilter(key as 'all' | 'high' | 'medium' | 'low')}
             style={{
               backgroundColor: filter === key ? '#3b82f6' : 'white',
               color: filter === key ? 'white' : '#6b7280',

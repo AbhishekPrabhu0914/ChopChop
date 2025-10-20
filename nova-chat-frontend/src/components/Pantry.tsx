@@ -182,7 +182,7 @@ export default function Pantry({ initialItems, onUpdate }: PantryProps) {
               </label>
               <select
                 value={newItem.freshness}
-                onChange={(e) => setNewItem({ ...newItem, freshness: e.target.value as any })}
+                onChange={(e) => setNewItem({ ...newItem, freshness: e.target.value as 'fresh' | 'good' | 'needs_use_soon' | 'expired' })}
                 style={{
                   width: '100%',
                   padding: '0.5rem',

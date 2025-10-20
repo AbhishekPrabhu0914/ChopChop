@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { authService, AuthResponse } from '../lib/auth';
+import { authService } from '../lib/auth';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -38,7 +38,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
       } else {
         setError(response.error || response.message || 'Failed to enter app');
       }
-    } catch (error) {
+    } catch {
       setError('An unexpected error occurred');
     } finally {
       setIsLoading(false);

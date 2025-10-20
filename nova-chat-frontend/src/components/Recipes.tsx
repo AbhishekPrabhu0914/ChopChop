@@ -370,7 +370,7 @@ Return the response as a JSON object with this structure:
         {['all', 'Easy', 'Medium', 'Hard'].map((difficulty) => (
           <button
             key={difficulty}
-            onClick={() => setFilter(difficulty as any)}
+            onClick={() => setFilter(difficulty as 'all' | 'Easy' | 'Medium' | 'Hard')}
             style={{
               backgroundColor: filter === difficulty ? '#3b82f6' : '#f3f4f6',
               color: filter === difficulty ? 'white' : '#374151',

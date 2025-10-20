@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       record_id: data.record_id
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error calling Python backend for save-data:', error);
     
     return NextResponse.json(

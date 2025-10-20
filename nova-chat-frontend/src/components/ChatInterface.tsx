@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Image from 'next/image';
 import GroceryList from './GroceryList';
 import Recipes from './Recipes';
 import Pantry from './Pantry';
-import { SupabaseService } from '../lib/supabase';
+// import { SupabaseService } from '../lib/supabase';
 import { authService } from '../lib/auth';
 
 interface Message {
@@ -14,7 +15,7 @@ interface Message {
   timestamp: Date;
   hasImage?: boolean;
   imageUrl?: string;
-  structuredData?: any;
+  structuredData?: unknown;
 }
 
 interface ChatInterfaceProps {
@@ -126,7 +127,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
                 if (dataResult.data.items && dataResult.data.items.length > 0) {
                   setGroceryItems(dataResult.data.items);
                   // Also populate pantry from the same items data
-                  const pantryItemsFromGrocery: PantryItem[] = dataResult.data.items.map((item: any) => ({
+                  const pantryItemsFromGrocery: PantryItem[] = dataResult.data.items.map((item: GroceryItem) => ({
                     name: item.item || item.name || 'Unknown item',
                     quantity: item.quantity || 'Unknown quantity',
                     category: item.category || 'other',
@@ -155,7 +156,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
 
               if (chatResult.success && chatResult.chat_history && chatResult.chat_history.length > 0) {
                 // Convert chat history to Message format
-                const chatMessages: Message[] = chatResult.chat_history.map((msg: any, index: number) => ({
+                const chatMessages: Message[] = chatResult.chat_history.map((msg: {text: string, sender: string}, index: number) => ({
                   id: `loaded-${index}-${Date.now()}`,
                   text: msg.message,
                   sender: msg.sender as 'user' | 'nova',
@@ -316,7 +317,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
           }
           if (structuredData.ingredients) {
             // Convert detected ingredients to pantry items
-            const pantryItemsFromIngredients: PantryItem[] = structuredData.ingredients.map((ingredient: any) => ({
+            const pantryItemsFromIngredients: PantryItem[] = structuredData.ingredients.map((ingredient: {name: string, quantity: string, category: string}) => ({
               name: ingredient.name || 'Unknown ingredient',
               quantity: ingredient.quantity || 'Unknown quantity',
               category: ingredient.category || 'other',
@@ -509,9 +510,11 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
               <div style={{ flex: 1 }}>
                 {message.hasImage && message.imageUrl && (
                   <div style={{ marginBottom: '0.5rem' }}>
-                    <img
+                    <Image
                       src={message.imageUrl}
                       alt="Uploaded"
+                      width={400}
+                      height={300}
                       style={{ maxWidth: '100%', height: 'auto', borderRadius: '0.375rem' }}
                     />
                   </div>

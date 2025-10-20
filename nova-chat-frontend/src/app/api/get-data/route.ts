@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       data: data.data
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error calling Python backend for get-data:', error);
     
     return NextResponse.json(

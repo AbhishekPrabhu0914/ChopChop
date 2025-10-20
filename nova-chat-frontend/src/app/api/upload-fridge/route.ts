@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
       response: data.response
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error calling Python backend for fridge analysis:', error);
     
     return NextResponse.json(
