@@ -185,7 +185,13 @@ class SupabaseManager:
                 update_res = self.supabase.table('Users').update(data).eq('email', user_email).execute()
             else:
                 # Create a new user record if none exists
-                data_with_email = {'email': user_email, 'recent_recipes': json.dumps(cleaned)}
+                # Ensure required columns such as items and recipes are present (use empty lists)
+                data_with_email = {
+                    'email': user_email,
+                    'recent_recipes': json.dumps(cleaned),
+                    'items': json.dumps([]),
+                    'recipes': json.dumps([])
+                }
                 update_res = self.supabase.table('Users').insert(data_with_email).execute()
 
             if update_res and update_res.data:
