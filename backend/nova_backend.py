@@ -504,18 +504,16 @@ def add_recent_recipe():
             }), 503
 
         data = request.get_json()
-        session_id = data.get('session_id')
+        email = data.get('email')
         recipe = data.get('recipe')
 
-        # Validate session
-        user_email = validate_session(session_id)
-        if not user_email:
-            return jsonify({"error": "Invalid or expired session"}), 401
+        if not email:
+            return jsonify({"error": "Email is required"}), 400
 
         if not recipe or not isinstance(recipe, dict):
             return jsonify({"error": "Recipe object is required"}), 400
 
-        success = supabase_manager.add_recent_recipe(user_email, recipe)
+        success = supabase_manager.add_recent_recipe(email, recipe)
 
         if success:
             return jsonify({"success": True, "message": "Recent recipe added"})
@@ -538,14 +536,12 @@ def get_recent_recipes():
             }), 503
 
         data = request.get_json()
-        session_id = data.get('session_id')
+        email = data.get('email')
 
-        # Validate session
-        user_email = validate_session(session_id)
-        if not user_email:
-            return jsonify({"error": "Invalid or expired session"}), 401
+        if not email:
+            return jsonify({"error": "Email is required"}), 400
 
-        recent = supabase_manager.get_recent_recipes(user_email)
+        recent = supabase_manager.get_recent_recipes(email)
 
         if recent is None:
             return jsonify({"success": False, "error": "Failed to retrieve recent recipes"}), 500
@@ -656,16 +652,14 @@ def update_data():
             }), 503
         
         data = request.get_json()
-        session_id = data.get('session_id')
+        email = data.get('email')
         items = data.get('items', [])
         recipes = data.get('recipes', [])
         
-        # Verify session
-        user_email = validate_session(session_id)
-        if not user_email:
-            return jsonify({"error": "Invalid or expired session"}), 401
+        if not email:
+            return jsonify({"error": "Email is required"}), 400
         
-        success = supabase_manager.update_user_data(user_email, items, recipes)
+        success = supabase_manager.update_user_data(email, items, recipes)
         
         if success:
             return jsonify({
@@ -697,16 +691,14 @@ def send_email():
             }), 503
         
         data = request.get_json()
-        session_id = data.get('session_id')
+        email = data.get('email')
         items = data.get('items', [])
         recipes = data.get('recipes', [])
         
-        # Verify session
-        user_email = validate_session(session_id)
-        if not user_email:
-            return jsonify({"error": "Invalid or expired session"}), 401
+        if not email:
+            return jsonify({"error": "Email is required"}), 400
         
-        success = supabase_manager.send_grocery_list_email(user_email, items, recipes)
+        success = supabase_manager.send_grocery_list_email(email, items, recipes)
         
         if success:
             return jsonify({

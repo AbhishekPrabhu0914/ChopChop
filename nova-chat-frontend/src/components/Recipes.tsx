@@ -25,10 +25,11 @@ interface PantryItem {
   detected_at: string;
 }
 
+
 interface RecipeGenerationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onGenerate: (difficulty: string, timeConstraint: string) => void;
+  onGenerate: (difficulty: string, timeConstraint: string, additionalNotes: string) => void;
   isLoading: boolean;
 }
 
@@ -38,13 +39,15 @@ interface RecipesProps {
   onRecipesGenerated?: (recipes: Recipe[]) => void;
 }
 
+
 const RecipeGenerationModal: React.FC<RecipeGenerationModalProps> = ({ isOpen, onClose, onGenerate, isLoading }) => {
   const [difficulty, setDifficulty] = useState('Easy');
   const [timeConstraint, setTimeConstraint] = useState('30 minutes');
+  const [additionalNotes, setAdditionalNotes] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onGenerate(difficulty, timeConstraint);
+    onGenerate(difficulty, timeConstraint, additionalNotes);
   };
 
   if (!isOpen) return null;
@@ -143,6 +146,35 @@ const RecipeGenerationModal: React.FC<RecipeGenerationModalProps> = ({ isOpen, o
             </select>
           </div>
 
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              color: '#374151',
+              marginBottom: '0.5rem',
+            }}>
+              Additional Notes (Optional)
+            </label>
+            <textarea
+              value={additionalNotes}
+              onChange={(e) => setAdditionalNotes(e.target.value)}
+              disabled={isLoading}
+              placeholder="e.g., vegetarian, spicy, kid-friendly, etc."
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                fontSize: '1rem',
+                backgroundColor: isLoading ? '#f9fafb' : 'white',
+                resize: 'vertical',
+                minHeight: '80px',
+                fontFamily: 'inherit',
+              }}
+            />
+          </div>
+
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button
               type="button"
@@ -191,8 +223,8 @@ const RecipeGenerationModal: React.FC<RecipeGenerationModalProps> = ({ isOpen, o
 export default function Recipes({ recipes, pantryItems = [], onRecipesGenerated }: RecipesProps) {
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [filter, setFilter] = useState<'all' | 'Easy' | 'Medium' | 'Hard'>('all');
-  const [showRecipeModal, setShowRecipeModal] = useState(false);
   const [isGeneratingRecipes, setIsGeneratingRecipes] = useState(false);
+  const [showRecipeModal, setShowRecipeModal] = useState(false);
 
   const filteredRecipes = recipes.filter(recipe => 
     filter === 'all' || recipe.difficulty === filter
@@ -214,7 +246,7 @@ export default function Recipes({ recipes, pantryItems = [], onRecipesGenerated 
     return '#ef4444';
   };
 
-  const generateRecipes = async (difficulty: string, timeConstraint: string) => {
+  const generateRecipes = async (difficulty: string, timeConstraint: string, additionalNotes: string = '') => {
     if (!onRecipesGenerated) return;
     
     setIsGeneratingRecipes(true);
@@ -223,13 +255,19 @@ export default function Recipes({ recipes, pantryItems = [], onRecipesGenerated 
     try {
       const availableIngredients = pantryItems.map(item => item.name).join(', ');
       
-      const prompt = `Based on these available ingredients: ${availableIngredients}
+      let prompt = `Based on these available ingredients: ${availableIngredients}
 
 Please generate 3 recipes that:
 - Are ${difficulty.toLowerCase()} difficulty
 - Can be prepared in ${timeConstraint}
 - Use primarily the available ingredients
-- Include clear cooking instructions
+- Include clear cooking instructions`;
+
+      if (additionalNotes.trim()) {
+        prompt += `\n- Additional requirements: ${additionalNotes}`;
+      }
+
+      prompt += `
 
 Return the response as a JSON object with this structure:
 {
@@ -277,24 +315,25 @@ Return the response as a JSON object with this structure:
           const parsedResponse = JSON.parse(data.response);
           if (parsedResponse.type === 'structured' && parsedResponse.data.recipes) {
             onRecipesGenerated(parsedResponse.data.recipes);
-            alert('Recipes generated successfully!');
+            // No alert - recipes are added directly to the page
           } else {
             throw new Error('Invalid response format');
           }
         } catch (parseError) {
           console.error('Error parsing recipe response:', parseError);
-          alert('Generated recipes but had trouble parsing them. Check the chat for the response.');
+          // Still no alert - just log the error
         }
       } else {
         throw new Error('Failed to generate recipes');
       }
     } catch (error) {
       console.error('Error generating recipes:', error);
-      alert('Sorry, I encountered an error generating recipes. Please try again.');
+      // No alert - just log the error
     } finally {
       setIsGeneratingRecipes(false);
     }
   };
+
 
   return (
     <div style={{ padding: '1rem', maxWidth: '1000px', margin: '0 auto' }}>
@@ -690,6 +729,7 @@ Return the response as a JSON object with this structure:
         onGenerate={generateRecipes}
         isLoading={isGeneratingRecipes}
       />
+
     </div>
   );
 }
