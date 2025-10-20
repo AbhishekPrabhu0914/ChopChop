@@ -91,10 +91,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
           marginTop: '2rem',
         }}>
           <div style={{ 
-            fontSize: '6rem', 
-            marginBottom: '1.5rem',
+            width: '96px',
+            height: '96px',
+            margin: '0 auto 1.5rem auto',
             filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.1))',
-          }}>🍳</div>
+          }}>
+            <img src="/favicon.ico" alt="ChopChop" style={{ width: '100%', height: '100%' }} />
+          </div>
           <h1 style={{
             fontSize: 'clamp(2.5rem, 5vw, 4rem)',
             fontWeight: '800',
@@ -269,10 +272,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
               e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.15)';
             }}>
               <div style={{ 
-                fontSize: '3rem', 
-                marginBottom: '1.5rem',
+                width: '48px',
+                height: '48px',
+                margin: '0 auto 1.5rem auto',
                 filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
-              }}>🍳</div>
+              }}>
+                <img src="/favicon.ico" alt="ChopChop" style={{ width: '100%', height: '100%' }} />
+              </div>
               <h3 style={{ 
                 fontSize: '1.5rem', 
                 fontWeight: '700', 
