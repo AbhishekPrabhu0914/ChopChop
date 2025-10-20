@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { message, email } = body;
+    const { message, email, imageBase64, imageFormat } = body;
 
     if (!message) {
       return NextResponse.json(
@@ -22,7 +22,9 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         message,
-        email
+        email,
+        imageBase64,
+        imageFormat
       }),
     });
 

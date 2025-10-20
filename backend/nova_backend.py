@@ -421,18 +421,10 @@ def chat():
         message = data.get('message')
         image_base64 = data.get('imageBase64')
         image_format = data.get('imageFormat')
-        session_id = data.get('session_id')
+        email = data.get('email')
         
         if not message:
             return jsonify({"error": "Message is required"}), 400
-        
-        # Verify session if provided (optional for image uploads)
-        user_email = None
-        if session_id:
-            user_email = validate_session(session_id)
-            if not user_email:
-                logger.warning(f"Invalid or expired session: {session_id}")
-                # Don't fail the request for image uploads, just skip saving to database
         
         logger.info(f"Received message: {message[:50]}...")
         if image_base64:
@@ -470,20 +462,20 @@ def chat():
             # Send message to Nova Pro model (text only)
             response_text = send_message_to_nova(message)
         
-        # Save chat message and response to database if user is authenticated
-        if user_email and supabase_manager.enabled:
+        # Save chat message and response to database if user email is provided
+        if email and supabase_manager.enabled:
             try:
                 # Save user message
-                supabase_manager.save_chat_message(user_email, message, 'user', image_base64, image_format)
+                supabase_manager.save_chat_message(email, message, 'user', image_base64, image_format)
                 
                 # Save Nova response
                 if isinstance(response_text, dict) and response_text.get('type') == 'structured':
                     # For structured responses, save the full response
-                    supabase_manager.save_chat_message(user_email, str(response_text), 'nova')
+                    supabase_manager.save_chat_message(email, str(response_text), 'nova')
                 else:
                     # For text responses, save as text
                     response_text_str = response_text if isinstance(response_text, str) else str(response_text)
-                    supabase_manager.save_chat_message(user_email, response_text_str, 'nova')
+                    supabase_manager.save_chat_message(email, response_text_str, 'nova')
                     
             except Exception as e:
                 logger.warning(f"Failed to save chat message: {e}")
@@ -575,39 +567,30 @@ def save_data():
             }), 503
         
         data = request.get_json()
-        session_id = data.get('session_id')
+        email = data.get('email')
         items = data.get('items', [])
         recipes = data.get('recipes', [])
         
-        # Try to verify session, but don't fail if invalid
-        user_email = None
-        if session_id:
-            user_email = validate_session(session_id)
-            if not user_email:
-                logger.warning(f"Invalid or expired session for save-data: {session_id}")
+        if not email:
+            return jsonify({
+                "success": False,
+                "error": "Email is required to save data"
+            }), 400
         
-        if user_email:
-            # User is authenticated, save to database
-            record_id = supabase_manager.save_user_data(user_email, items, recipes)
-            
-            if record_id:
-                return jsonify({
-                    "success": True,
-                    "message": "Data saved successfully",
-                    "record_id": record_id
-                })
-            else:
-                return jsonify({
-                    "success": False,
-                    "error": "Failed to save data"
-                }), 500
-        else:
-            # User not authenticated, but don't fail the request
-            logger.info("Save data request without valid session - data not persisted")
+        # User is authenticated with email, save to database
+        record_id = supabase_manager.save_user_data(email, items, recipes)
+        
+        if record_id:
             return jsonify({
                 "success": True,
-                "message": "Data processed (not saved - please sign in to persist data)"
+                "message": "Data saved successfully",
+                "record_id": record_id
             })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Failed to save data"
+            }), 500
             
     except Exception as e:
         logger.error(f"Error saving data: {e}")
@@ -628,36 +611,23 @@ def get_data():
             }), 503
         
         data = request.get_json()
-        session_id = data.get('session_id')
+        email = data.get('email')
         
-        # Try to verify session, but don't fail if invalid
-        user_email = None
-        if session_id:
-            user_email = validate_session(session_id)
-            if not user_email:
-                logger.warning(f"Invalid or expired session for get-data: {session_id}")
+        if not email:
+            return jsonify({
+                "success": False,
+                "error": "Email is required to retrieve data"
+            }), 400
         
-        if user_email:
-            # User is authenticated, retrieve from database
-            user_data = supabase_manager.get_user_data(user_email)
-            
-            if user_data:
-                return jsonify({
-                    "success": True,
-                    "data": user_data
-                })
-            else:
-                return jsonify({
-                    "success": True,
-                    "data": {
-                        "id": None,
-                        "items": [],
-                        "recipes": []
-                    }
-                })
+        # User is authenticated with email, retrieve from database
+        user_data = supabase_manager.get_user_data(email)
+        
+        if user_data:
+            return jsonify({
+                "success": True,
+                "data": user_data
+            })
         else:
-            # User not authenticated, return empty data
-            logger.info("Get data request without valid session - returning empty data")
             return jsonify({
                 "success": True,
                 "data": {
@@ -768,32 +738,23 @@ def get_chat_history():
             }), 503
         
         data = request.get_json()
-        session_id = data.get('session_id')
+        email = data.get('email')
         
-        # Try to verify session, but don't fail if invalid
-        user_email = None
-        if session_id:
-            user_email = validate_session(session_id)
-            if not user_email:
-                logger.warning(f"Invalid or expired session for chat-history: {session_id}")
+        if not email:
+            return jsonify({
+                "success": False,
+                "error": "Email is required to retrieve chat history"
+            }), 400
         
-        if user_email:
-            # User is authenticated, retrieve chat history
-            chat_history = supabase_manager.get_chat_history(user_email)
-            
-            if chat_history is not None:
-                return jsonify({
-                    "success": True,
-                    "chat_history": chat_history
-                })
-            else:
-                return jsonify({
-                    "success": True,
-                    "chat_history": []
-                })
+        # User is authenticated with email, retrieve chat history
+        chat_history = supabase_manager.get_chat_history(email)
+        
+        if chat_history is not None:
+            return jsonify({
+                "success": True,
+                "chat_history": chat_history
+            })
         else:
-            # User not authenticated, return empty chat history
-            logger.info("Chat history request without valid session - returning empty history")
             return jsonify({
                 "success": True,
                 "chat_history": []
