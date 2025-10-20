@@ -106,6 +106,7 @@ const RecipeGenerationModal: React.FC<RecipeGenerationModalProps> = ({ isOpen, o
                 borderRadius: '0.375rem',
                 fontSize: '1rem',
                 backgroundColor: isLoading ? '#f9fafb' : 'white',
+                color: 'black',
               }}
             >
               <option value="Easy">Easy</option>
@@ -135,6 +136,7 @@ const RecipeGenerationModal: React.FC<RecipeGenerationModalProps> = ({ isOpen, o
                 borderRadius: '0.375rem',
                 fontSize: '1rem',
                 backgroundColor: isLoading ? '#f9fafb' : 'white',
+                color: 'black',
               }}
             >
               <option value="15 minutes">15 minutes</option>
@@ -171,6 +173,7 @@ const RecipeGenerationModal: React.FC<RecipeGenerationModalProps> = ({ isOpen, o
                 resize: 'vertical',
                 minHeight: '80px',
                 fontFamily: 'inherit',
+                color: 'black',
               }}
             />
           </div>
@@ -420,7 +423,7 @@ Return the response as a JSON object with this structure:
               
               <p style={{ 
                 fontSize: '0.875rem', 
-                color: '#6b7280', 
+                color: 'black', 
                 marginBottom: '0.75rem',
                 lineHeight: '1.4'
               }}>
@@ -466,7 +469,7 @@ Return the response as a JSON object with this structure:
                 </span>
               </div>
 
-              <div style={{ fontSize: '0.875rem', color: '#374151' }}>
+              <div style={{ fontSize: '0.875rem', color: 'black' }}>
                 <div style={{ marginBottom: '0.25rem' }}>
                   <strong>Ingredients:</strong> {recipe.ingredients_needed.length} items
                 </div>
@@ -483,7 +486,7 @@ Return the response as a JSON object with this structure:
         <div style={{ 
           textAlign: 'center', 
           padding: '2rem', 
-          color: '#6b7280',
+          color: 'black',
           backgroundColor: 'white',
           borderRadius: '0.5rem',
           border: '1px solid #e5e7eb'
@@ -546,7 +549,7 @@ Return the response as a JSON object with this structure:
 
               <p style={{ 
                 fontSize: '1rem', 
-                color: '#6b7280', 
+                color: 'black', 
                 marginBottom: '1rem',
                 lineHeight: '1.5'
               }}>
@@ -620,7 +623,7 @@ Return the response as a JSON object with this structure:
                               backgroundColor: '#f9fafb',
                               borderRadius: '0.375rem',
                               border: '1px solid #d1d5db',
-                              color: '#374151'
+                              color: 'black'
                             }}
                           >
                             {ingredient.amount} {ingredient.name}
@@ -629,7 +632,7 @@ Return the response as a JSON object with this structure:
                       {selectedRecipe.ingredients_needed.filter(ingredient => ingredient.available).length === 0 && (
                         <div style={{ 
                           padding: '0.5rem', 
-                          color: '#6b7280', 
+                          color: 'black', 
                           fontStyle: 'italic',
                           textAlign: 'center'
                         }}>
@@ -662,7 +665,7 @@ Return the response as a JSON object with this structure:
                               backgroundColor: '#f9fafb',
                               borderRadius: '0.375rem',
                               border: '1px solid #d1d5db',
-                              color: '#374151'
+                              color: 'black'
                             }}
                           >
                             {ingredient.amount} {ingredient.name}
@@ -671,7 +674,7 @@ Return the response as a JSON object with this structure:
                       {selectedRecipe.ingredients_needed.filter(ingredient => !ingredient.available).length === 0 && (
                         <div style={{ 
                           padding: '0.5rem', 
-                          color: '#6b7280', 
+                          color: 'black', 
                           fontStyle: 'italic',
                           textAlign: 'center'
                         }}>
@@ -692,7 +695,7 @@ Return the response as a JSON object with this structure:
                     <li key={index} style={{ 
                       marginBottom: '0.5rem', 
                       lineHeight: '1.5',
-                      color: '#374151'
+                      color: 'black'
                     }}>
                       {instruction}
                     </li>

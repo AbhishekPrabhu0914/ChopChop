@@ -181,17 +181,8 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
         const user = authService.getCurrentUser();
         if (user && (groceryItems.length > 0 || recipes.length > 0 || pantryItems.length > 0)) {
           try {
-            // Convert pantry items back to grocery items format for saving
-            const updatedGroceryItems = pantryItems.map(pantryItem => ({
-              item: pantryItem.name,
-              category: pantryItem.category,
-              needed_for: 'pantry',
-              priority: 'medium' as const,
-              checked: false,
-              quantity: pantryItem.quantity,
-              freshness: pantryItem.freshness,
-              detected_at: pantryItem.detected_at
-            }));
+            // Save the user's actual grocery list
+            const itemsToSave = groceryItems;
             
             await fetch('/api/save-data', {
               method: 'POST',
@@ -200,7 +191,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
               },
               body: JSON.stringify({
                 email: user?.email,
-                items: updatedGroceryItems,
+                items: itemsToSave,
                 recipes: recipes,
               }),
             });
@@ -332,7 +323,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
           
           const novaMessage: Message = {
             id: `nova-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            text: `I've analyzed your fridge! I found ${structuredData.ingredients?.length || 0} ingredients and created ${structuredData.recipes?.length || 0} recipes for you. Check out the Pantry, Grocery List, and Recipes tabs!`,
+            text: `I've analyzed your fridge! I found ${structuredData.ingredients?.length || 0} ingredients and created ${structuredData.recipes?.length || 0} recipes for you. Checkout the Pantry tab for the list of ingredients I found!`,
             sender: 'nova',
             timestamp: new Date(),
             structuredData: structuredData

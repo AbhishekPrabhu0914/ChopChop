@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: chopchop-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install --no-cache-dir -r requirements.txt
+    startCommand: gunicorn -w 2 -k gthread -b 0.0.0.0:$PORT nova_backend:app
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: FLASK_DEBUG
+        value: "false"
+
+  - type: web
+    name: chopchop-frontend
+    runtime: node
+    rootDir: nova-chat-frontend
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: PYTHON_BACKEND_URL
+        fromService:
+          type: web
+          name: chopchop-backend
+          property: url

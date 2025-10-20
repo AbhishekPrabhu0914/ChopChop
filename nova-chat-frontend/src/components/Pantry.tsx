@@ -279,23 +279,34 @@ export default function Pantry({ initialItems, onUpdate }: PantryProps) {
         <div style={{ display: 'grid', gap: '0.75rem' }}>
           {items.map((item, index) => (
             <div
-              key={index}
+              key={item.id || index}
               style={{
                 backgroundColor: 'white',
                 border: '1px solid #e5e7eb',
-                borderRadius: '0.5rem',
+                borderRadius: '0.75rem',
                 padding: '1rem',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '1rem'
+                gap: '1rem',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                borderLeft: `4px solid ${getFreshnessColor(item.freshness)}`,
+                transition: 'box-shadow 0.2s, transform 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
+                e.currentTarget.style.transform = 'translateY(-1px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.03)';
+                e.currentTarget.style.transform = 'translateY(0)';
               }}
             >
               <div style={{ fontSize: '1.5rem' }}>
                 {getFreshnessIcon(item.freshness)}
               </div>
-              
+
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem', flexWrap: 'wrap' }}>
                   <input
                     type="text"
                     value={item.name}
@@ -304,66 +315,74 @@ export default function Pantry({ initialItems, onUpdate }: PantryProps) {
                       fontSize: '1rem',
                       fontWeight: '600',
                       color: '#1f2937',
-                      border: 'none',
+                      border: '1px solid transparent',
                       background: 'transparent',
-                      padding: '0.25rem',
-                      borderRadius: '0.25rem',
-                      minWidth: '100px'
+                      padding: '0.25rem 0.375rem',
+                      borderRadius: '0.375rem',
+                      minWidth: '120px'
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.background = '#f9fafb';
+                      e.currentTarget.style.borderColor = '#d1d5db';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.borderColor = 'transparent';
                     }}
                   />
                   <span style={{
                     fontSize: '0.75rem',
-                    color: '#6b7280',
-                    backgroundColor: '#f3f4f6',
+                    color: '#1f2937',
+                    backgroundColor: '#e5e7eb',
                     padding: '0.125rem 0.5rem',
-                    borderRadius: '0.25rem'
+                    borderRadius: '9999px'
                   }}>
                     {item.category || 'uncategorized'}
                   </span>
+                  {item.quantity && (
+                    <span style={{
+                      fontSize: '0.75rem',
+                      color: '#065f46',
+                      backgroundColor: '#d1fae5',
+                      padding: '0.125rem 0.5rem',
+                      borderRadius: '9999px'
+                    }}>
+                      {item.quantity}
+                    </span>
+                  )}
                 </div>
-                
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.875rem', color: '#6b7280' }}>
-                  <input
-                    type="text"
-                    value={item.quantity}
-                    onChange={(e) => handleUpdateItem(index, 'quantity', e.target.value)}
-                    placeholder="Quantity"
-                    style={{
-                      border: 'none',
-                      background: 'transparent',
-                      padding: '0.25rem',
-                      borderRadius: '0.25rem',
-                      minWidth: '80px',
-                      fontSize: '0.875rem'
-                    }}
-                  />
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.875rem', color: '#6b7280', flexWrap: 'wrap' }}>
                   <select
                     value={item.freshness}
                     onChange={(e) => handleUpdateItem(index, 'freshness', e.target.value)}
                     style={{
-                      border: 'none',
-                      background: 'transparent',
+                      border: '1px solid #e5e7eb',
+                      background: 'white',
                       fontSize: '0.875rem',
                       color: getFreshnessColor(item.freshness),
-                      fontWeight: '500'
+                      fontWeight: '600',
+                      borderRadius: '0.375rem',
+                      padding: '0.25rem 0.5rem'
                     }}
                   >
                     <option value="fresh">Fresh</option>
                     <option value="needs_use_soon">Needs Use Soon</option>
                     <option value="expired">Expired</option>
                   </select>
-                  <span style={{ fontSize: '0.75rem' }}>
+                  <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>
+                    Detected {new Date(item.detected_at).toLocaleDateString()}
                   </span>
                 </div>
               </div>
-              
+
               <button
                 onClick={() => handleRemoveItem(index)}
                 style={{
-                  backgroundColor: '#ef4444',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.375rem',
+                  backgroundColor: '#fee2e2',
+                  color: '#991b1b',
+                  border: '1px solid #fecaca',
+                  borderRadius: '0.5rem',
                   padding: '0.5rem',
                   fontSize: '0.875rem',
                   cursor: 'pointer',
@@ -371,7 +390,16 @@ export default function Pantry({ initialItems, onUpdate }: PantryProps) {
                   alignItems: 'center',
                   justifyContent: 'center',
                   minWidth: '2rem',
-                  height: '2rem'
+                  height: '2rem',
+                  transition: 'background-color 0.2s, border-color 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#fecaca';
+                  e.currentTarget.style.borderColor = '#fca5a5';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#fee2e2';
+                  e.currentTarget.style.borderColor = '#fecaca';
                 }}
                 title="Remove item"
               >
