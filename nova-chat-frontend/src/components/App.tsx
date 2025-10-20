@@ -15,7 +15,6 @@ export default function App() {
       if (authService.isAuthenticated()) {
         const user = authService.getCurrentUser();
         if (user) {
-          setUserEmail(user.email);
           setIsAuthenticated(true);
         }
       }
@@ -25,14 +24,12 @@ export default function App() {
     checkAuth();
   }, []);
 
-  const handleEnterApp = (email: string) => {
-    setUserEmail(email);
+  const handleEnterApp = () => {
     setIsAuthenticated(true);
   };
 
   const handleSignOut = async () => {
     await authService.signOut();
-    setUserEmail('');
     setIsAuthenticated(false);
   };
 

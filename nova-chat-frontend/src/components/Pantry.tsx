@@ -1,19 +1,41 @@
 'use client';
 
 import { useState } from 'react';
+import { PantryItem } from '../types/PantryItem';
 
-interface PantryItem {
-  name: string;
-  quantity: string;
-  category: string;
-  freshness: 'fresh' | 'good' | 'needs_use_soon' | 'expired';
-  detected_at: string;
-}
+type Freshness = 'fresh' | 'needs_use_soon' | 'expired';
 
 interface PantryProps {
   initialItems: PantryItem[];
-  onUpdate: (items: PantryItem[]) => void;
+  onUpdate: (updatedItems: PantryItem[]) => void;
 }
+
+const pantryItems: PantryItem[] = [
+  {
+    id: '1',
+    name: 'Tomatoes',
+    quantity: '2 lbs',
+    category: 'vegetables',
+    freshness: 'fresh',
+    detected_at: '2024-01-15T10:00:00Z'
+  },
+  {
+    id: '2',
+    name: 'Milk',
+    quantity: '1 gallon',
+    category: 'dairy',
+    freshness: 'needs_use_soon',
+    detected_at: '2024-01-10T12:30:00Z'
+  },
+  {
+    id: '3',
+    name: 'Chicken Breast',
+    quantity: '3 pieces',
+    category: 'meat',
+    freshness: 'expired',
+    detected_at: '2024-01-05T09:15:00Z'
+  }
+];
 
 export default function Pantry({ initialItems, onUpdate }: PantryProps) {
   const [items, setItems] = useState<PantryItem[]>(initialItems);
@@ -21,13 +43,16 @@ export default function Pantry({ initialItems, onUpdate }: PantryProps) {
     name: '',
     quantity: '',
     category: '',
-    freshness: 'fresh' as const
+    freshness: 'fresh' as Freshness
   });
   const [showAddForm, setShowAddForm] = useState(false);
 
   const handleAddItem = () => {
     if (newItem.name.trim()) {
       const item: PantryItem = {
+        id: (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+          ? (crypto as Crypto).randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
         ...newItem,
         detected_at: new Date().toISOString()
       };
@@ -56,7 +81,6 @@ export default function Pantry({ initialItems, onUpdate }: PantryProps) {
   const getFreshnessColor = (freshness: string) => {
     switch (freshness) {
       case 'fresh': return '#10b981'; // green
-      case 'good': return '#3b82f6'; // blue
       case 'needs_use_soon': return '#f59e0b'; // yellow
       case 'expired': return '#ef4444'; // red
       default: return '#6b7280'; // gray
@@ -66,7 +90,6 @@ export default function Pantry({ initialItems, onUpdate }: PantryProps) {
   const getFreshnessIcon = (freshness: string) => {
     switch (freshness) {
       case 'fresh': return '🟢';
-      case 'good': return '🔵';
       case 'needs_use_soon': return '🟡';
       case 'expired': return '🔴';
       default: return '⚪';
@@ -182,7 +205,12 @@ export default function Pantry({ initialItems, onUpdate }: PantryProps) {
               </label>
               <select
                 value={newItem.freshness}
-                onChange={(e) => setNewItem({ ...newItem, freshness: e.target.value as 'fresh' | 'good' | 'needs_use_soon' | 'expired' })}
+                onChange={(e) =>
+                  setNewItem({
+                    ...newItem,
+                    freshness: e.target.value as 'fresh' | 'needs_use_soon' | 'expired', // Ensure type compatibility
+                  })
+                }
                 style={{
                   width: '100%',
                   padding: '0.5rem',
@@ -192,7 +220,6 @@ export default function Pantry({ initialItems, onUpdate }: PantryProps) {
                 }}
               >
                 <option value="fresh">Fresh</option>
-                <option value="good">Good</option>
                 <option value="needs_use_soon">Needs Use Soon</option>
                 <option value="expired">Expired</option>
               </select>
@@ -322,12 +349,10 @@ export default function Pantry({ initialItems, onUpdate }: PantryProps) {
                     }}
                   >
                     <option value="fresh">Fresh</option>
-                    <option value="good">Good</option>
                     <option value="needs_use_soon">Needs Use Soon</option>
                     <option value="expired">Expired</option>
                   </select>
                   <span style={{ fontSize: '0.75rem' }}>
-                    Added {new Date(item.detected_at).toLocaleDateString()}
                   </span>
                 </div>
               </div>

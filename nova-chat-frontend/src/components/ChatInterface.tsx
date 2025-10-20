@@ -7,6 +7,7 @@ import Recipes from './Recipes';
 import Pantry from './Pantry';
 // import { SupabaseService } from '../lib/supabase';
 import { authService } from '../lib/auth';
+import { PantryItem } from '../types/PantryItem';
 
 interface Message {
   id: string;
@@ -43,14 +44,6 @@ interface Recipe {
   }>;
   instructions: string[];
   tips: string;
-}
-
-interface PantryItem {
-  name: string;
-  quantity: string;
-  category: string;
-  freshness: 'fresh' | 'good' | 'needs_use_soon' | 'expired';
-  detected_at: string;
 }
 
 export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
@@ -128,11 +121,11 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
                   setGroceryItems(dataResult.data.items);
                   // Also populate pantry from the same items data
                   const pantryItemsFromGrocery: PantryItem[] = dataResult.data.items.map((item: GroceryItem) => ({
-                    name: item.item || item.name || 'Unknown item',
-                    quantity: item.quantity || 'Unknown quantity',
+                    name: item.item || 'Unknown item',
+                    quantity: 'Unknown quantity',
                     category: item.category || 'other',
-                    freshness: item.freshness || 'good',
-                    detected_at: item.detected_at || new Date().toISOString()
+                    freshness: 'good',
+                    detected_at: new Date().toISOString()
                   }));
                   setPantryItems(pantryItemsFromGrocery);
                 }
@@ -158,12 +151,12 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
                 // Convert chat history to Message format
                 const chatMessages: Message[] = chatResult.chat_history.map((msg: {text: string, sender: string}, index: number) => ({
                   id: `loaded-${index}-${Date.now()}`,
-                  text: msg.message,
+                    text: msg.text,
                   sender: msg.sender as 'user' | 'nova',
-                  timestamp: new Date(msg.timestamp || Date.now()),
-                  hasImage: !!msg.image_data,
-                  imageUrl: msg.image_data ? `data:image/${msg.image_format || 'jpeg'};base64,${msg.image_data}` : undefined,
-                  structuredData: msg.sender === 'nova' && msg.message.includes('{') ? JSON.parse(msg.message) : undefined
+                  timestamp: new Date(Date.now()),
+                  hasImage: false,
+                  imageUrl: undefined,
+                  structuredData: msg.sender === 'nova' && msg.text.includes('{') ? JSON.parse(msg.text) : undefined
                 }));
 
                 // Replace the initial welcome message with loaded chat history
@@ -321,7 +314,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
               name: ingredient.name || 'Unknown ingredient',
               quantity: ingredient.quantity || 'Unknown quantity',
               category: ingredient.category || 'other',
-              freshness: ingredient.freshness || 'good',
+              freshness: 'good',
               detected_at: new Date().toISOString()
             }));
             setPantryItems(prev => {
@@ -461,7 +454,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id as 'chat' | 'grocery' | 'recipes' | 'pantry')}
               style={{
                 backgroundColor: activeTab === tab.id ? '#3b82f6' : 'transparent',
                 color: activeTab === tab.id ? 'white' : '#6b7280',

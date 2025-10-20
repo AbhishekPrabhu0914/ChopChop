@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { authService } from '../lib/auth';
 import AuthModal from './AuthModal';
 
@@ -96,7 +97,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
             margin: '0 auto 1.5rem auto',
             filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.1))',
           }}>
-            <img src="/favicon.ico" alt="ChopChop" style={{ width: '100%', height: '100%' }} />
+            <Image src="/favicon.ico" alt="ChopChop" width={32} height={32} style={{ width: '100%', height: '100%' }} />
           </div>
           <h1 style={{
             fontSize: 'clamp(2.5rem, 5vw, 4rem)',
@@ -124,7 +125,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
             and intelligent fridge photo analysis. Cook smarter, waste less, enjoy more.
           </p>
           
-          {/* CTA Buttons */}
+          {/* CTA Button */}
           <div style={{
             display: 'flex',
             gap: '1rem',
@@ -156,32 +157,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
               }}
             >
               🚀 Get Started Free
-            </button>
-            <button
-              style={{
-                padding: '1rem 2rem',
-                border: '2px solid rgba(248, 250, 252, 0.4)',
-                borderRadius: '50px',
-                backgroundColor: 'rgba(248, 250, 252, 0.1)',
-                color: '#f8fafc',
-                fontSize: '1.1rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                backdropFilter: 'blur(10px)',
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(248, 250, 252, 0.2)';
-                e.currentTarget.style.borderColor = 'rgba(248, 250, 252, 0.6)';
-                e.currentTarget.style.transform = 'translateY(-1px)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(248, 250, 252, 0.1)';
-                e.currentTarget.style.borderColor = 'rgba(248, 250, 252, 0.4)';
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}
-            >
-              📖 Learn More
             </button>
           </div>
         </div>
@@ -277,7 +252,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
                 margin: '0 auto 1.5rem auto',
                 filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
               }}>
-                <img src="/favicon.ico" alt="ChopChop" style={{ width: '100%', height: '100%' }} />
+                <Image src="/favicon.ico" alt="ChopChop" width={32} height={32} style={{ width: '100%', height: '100%' }} />
               </div>
               <h3 style={{ 
                 fontSize: '1.5rem', 
