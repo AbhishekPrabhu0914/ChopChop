@@ -61,6 +61,9 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
   const [activeTab, setActiveTab] = useState<'chat' | 'grocery' | 'recipes' | 'pantry'>('chat');
   const [groceryItems, setGroceryItems] = useState<GroceryItem[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const handleRecipesGenerated = (newRecipes: Recipe[]) => {
+    setRecipes(prevRecipes => [...prevRecipes, ...newRecipes]);
+  };
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
   const [userEmail, setUserEmail] = useState<string>('');
   const [isLoadingData, setIsLoadingData] = useState<boolean>(true);
@@ -127,7 +130,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
                   setPantryItems(pantryItemsFromGrocery);
                 }
                 if (dataResult.data.recipes && dataResult.data.recipes.length > 0) {
-                  setRecipes(dataResult.data.recipes);
+                  setRecipes(prevRecipes => [...prevRecipes, ...dataResult.data.recipes]);
                 }
               }
 
@@ -214,6 +217,99 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
   }, [groceryItems, recipes, pantryItems, isLoadingData]);
 
 
+  const uploadImage = async (file: File) => {
+    console.log('Starting image upload:', file.name, file.type, file.size);
+    
+    // Check file size (limit to 100MB)
+    if (file.size > 100 * 1024 * 1024) {
+      alert('Image too large. Maximum supported size is 100MB. Please compress or resize your image.');
+      return;
+    }
+    
+    // Check file format
+    const supportedFormats = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!supportedFormats.includes(file.type.toLowerCase())) {
+      alert('Unsupported image format. Please use JPEG, PNG, GIF, or WebP images.');
+      return;
+    }
+    
+    // Create image preview for user message
+    const imagePreviewUrl = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.readAsDataURL(file);
+    });
+
+    // Add user message showing the uploaded image
+    const userMessage: Message = {
+      id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      text: inputMessage || "📸 Uploaded image - analyzing...",
+      sender: 'user',
+      timestamp: new Date(),
+      hasImage: true,
+      imageUrl: imagePreviewUrl
+    };
+    setMessages(prev => [...prev, userMessage]);
+
+    setIsLoading(true);
+
+    try {
+      const imageBase64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(',')[1]);
+        };
+        reader.readAsDataURL(file);
+      });
+
+      const user = authService.getCurrentUser();
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: inputMessage || "Please analyze this image and provide helpful information about what you see.",
+          imageBase64,
+          imageFormat: file.type.split('/')[1],
+          email: user?.email
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        const novaMessage: Message = {
+          id: `nova-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          text: data.response,
+          sender: 'nova',
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, novaMessage]);
+        setInputMessage(''); // Clear input after successful upload
+      } else {
+        console.error('Backend error:', data);
+        throw new Error(data.error || 'Failed to get response');
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      const errorMessage: Message = {
+        id: `error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        text: 'Sorry, I encountered an error analyzing the image. Please try again.',
+        sender: 'nova',
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const uploadFridgePhoto = async (file: File) => {
     console.log('Starting fridge photo upload:', file.name, file.type, file.size);
     
@@ -267,13 +363,13 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
       console.log('Sending request to backend with imageBase64 length:', imageBase64.length);
       const user = authService.getCurrentUser();
       const apiUrl = `${window.location.origin}/api/upload-fridge`;
-      console.log('Calling upload API at', apiUrl);
-      const response = await fetch(apiUrl, {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          message: "Analyze this fridge photo and suggest recipes based on the ingredients you can see. List the ingredients first, then provide 2-3 recipe suggestions with cooking instructions.",
           imageBase64,
           imageFormat: file.type.split('/')[1],
           email: user?.email
@@ -296,7 +392,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
             setGroceryItems(structuredData.grocery_list);
           }
           if (structuredData.recipes) {
-            setRecipes(structuredData.recipes);
+            setRecipes(prevRecipes => [...prevRecipes, ...structuredData.recipes]);
           }
           if (structuredData.ingredients) {
             // Convert detected ingredients to pantry items
@@ -609,7 +705,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
           <Recipes 
             recipes={recipes} 
             pantryItems={pantryItems}
-            onRecipesGenerated={setRecipes}
+            onRecipesGenerated={handleRecipesGenerated}
           />
         )}
       </div>
@@ -639,6 +735,40 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
                 rows={1}
               />
             </div>
+            
+            <button
+              onClick={() => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/jpeg,image/jpg,image/png,image/gif,image/webp';
+                input.onchange = (e) => {
+                  const file = (e.target as HTMLInputElement).files?.[0];
+                  if (file) {
+                    uploadImage(file);
+                  }
+                };
+                input.click();
+              }}
+              disabled={isLoading}
+              style={{
+                backgroundColor: '#10b981',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.5rem',
+                padding: '0.75rem',
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                opacity: isLoading ? 0.5 : 1,
+                fontSize: '1rem',
+                fontWeight: '500',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minWidth: '3rem'
+              }}
+              title="Upload Image"
+            >
+              📷
+            </button>
             
             <button
               onClick={sendMessage}

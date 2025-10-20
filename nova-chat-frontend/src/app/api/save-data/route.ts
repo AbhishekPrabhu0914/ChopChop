@@ -15,8 +15,8 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         email,
-        type: 'pantry',
-        data: { items, recipes }
+        items,
+        recipes
       }),
     });
 
