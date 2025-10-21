@@ -209,12 +209,58 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
 
 
 
+  const compressImage = async (file: File, maxSizeMB: number = 3): Promise<File> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      img.onload = () => {
+        // Calculate new dimensions to fit within maxSizeMB
+        let { width, height } = img;
+        const maxDimension = 1024; // Max width/height
+        const quality = 0.8;
+        
+        // Resize if too large
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = (height * maxDimension) / width;
+            width = maxDimension;
+          } else {
+            width = (width * maxDimension) / height;
+            height = maxDimension;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        // Draw and compress
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const compressedFile = new File([blob], file.name, {
+              type: 'image/jpeg',
+              lastModified: Date.now()
+            });
+            resolve(compressedFile);
+          } else {
+            resolve(file); // Fallback to original
+          }
+        }, 'image/jpeg', quality);
+      };
+      
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   const uploadFridgePhoto = async (file: File) => {
     console.log('Starting fridge photo upload:', file.name, file.type, file.size);
     
-    // Check file size (limit to 100MB)
-    if (file.size > 100 * 1024 * 1024) {
-      alert('Image too large. Maximum supported size is 100MB. Please compress or resize your image.');
+    // Check file size (limit to 4MB for Vercel compatibility)
+    if (file.size > 4 * 1024 * 1024) {
+      alert('Image too large. Maximum supported size is 4MB. Please compress or resize your image.');
       return;
     }
     
@@ -250,13 +296,16 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
     setIsLoading(true);
 
     try {
+      // Compress image if it's too large
+      const compressedFile = await compressImage(file);
+      
       const imageBase64 = await new Promise<string>((resolve) => {
         const reader = new FileReader();
         reader.onload = () => {
           const result = reader.result as string;
           resolve(result.split(',')[1]);
         };
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(compressedFile);
       });
 
       console.log('Sending request to backend with imageBase64 length:', imageBase64.length);

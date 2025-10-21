@@ -67,7 +67,7 @@ def validate_session(session_id):
             del user_sessions[session_id]
     return None
 
-def preprocess_image(image_base64, max_size_mb=4, max_dimension=2048):
+def preprocess_image(image_base64, max_size_mb=3, max_dimension=1024):
     """
     Preprocess image to meet AWS Bedrock requirements
     
@@ -429,11 +429,11 @@ def chat():
         logger.info(f"Received message: {message[:50]}...")
         if image_base64:
             logger.info(f"Received image with format: {image_format}")
-            # Check image size (limit to 100MB)
+            # Check image size (limit to 4MB for Vercel compatibility)
             image_size_mb = len(image_base64) * 3 / 4 / 1024 / 1024  # Approximate size from base64
-            if image_size_mb > 100:
+            if image_size_mb > 4:
                 return jsonify({
-                    "error": f"Image too large ({image_size_mb:.1f}MB). Maximum supported size is 100MB."
+                    "error": f"Image too large ({image_size_mb:.1f}MB). Maximum supported size is 4MB."
                 }), 400
             
             # Preprocess image to meet AWS Bedrock requirements
