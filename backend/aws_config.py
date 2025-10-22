@@ -83,23 +83,25 @@ class AWSConfig:
             logger.error(f"❌ Unexpected error initializing AWS client: {e}")
             return None
     
-    def _test_bedrock_access(self) -> bool:
-        """Best-effort Bedrock availability check.
-        Uses Bedrock control plane list_foundation_models if available; otherwise proceeds.
-        """
-        try:
-            control = boto3.client("bedrock", region_name=self.region)
-            # Call without optional params for maximum compatibility across SDK versions
-            control.list_foundation_models()
-            logger.info("✅ Bedrock control plane reachable")
-            return True
-        except ClientError as e:
-            # Lack of permissions to control plane is acceptable; proceed to runtime usage
-            logger.warning(f"⚠️ Bedrock control plane check skipped/denied: {e}")
-            return True
-        except Exception as e:
-            logger.warning(f"⚠️ Bedrock control plane check failed: {e}")
-            return True
+        def _test_bedrock_access(self) -> bool:
+            """
+            Best-effort Bedrock availability check.
+            Uses the control-plane list_foundation_models only if supported.
+            Does NOT fail if unavailable (for BedrockRuntime-only credentials).
+            """
+            try:
+                control = boto3.client("bedrock", region_name=self.region)
+                if hasattr(control, "list_foundation_models"):
+                    control.list_foundation_models()
+                    logger.info("✅ Bedrock control plane reachable")
+                else:
+                    logger.info("ℹ️ Bedrock control client does not support list_foundation_models; skipping test")
+                return True
+            except Exception as e:
+                logger.warning(f"⚠️ Skipping Bedrock control-plane check: {e}")
+                # Don’t fail — runtime will still work
+                return True
+
     
     def get_bedrock_client(self) -> Optional[boto3.client]:
         """Get Bedrock client (creates if not already initialized)"""
