@@ -32,32 +32,8 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Check if we're in the backend directory
-if [ ! -f "nova_backend.py" ]; then
-    print_error "This script must be run from the backend directory"
-    print_error "Please cd to the backend directory and run: ./startup.sh"
-    exit 1
-fi
-
-# Check if Python is available
-if ! command -v python3 &> /dev/null; then
-    print_error "Python 3 is not installed or not in PATH"
-    exit 1
-fi
 
 print_status "Python version: $(python3 --version)"
-
-# Check if virtual environment exists and activate it
-if [ -d "../venv" ]; then
-    print_status "Activating virtual environment..."
-    source ../venv/bin/activate
-    print_success "Virtual environment activated"
-else
-    print_warning "No virtual environment found. Using system Python."
-fi
-
-# Load environment variables
-print_status "Loading environment variables..."
 
 # Set default values
 export AWS_REGION=${AWS_REGION:-"us-east-1"}
@@ -80,5 +56,87 @@ export SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-""}
 export FLASK_DEBUG=${FLASK_DEBUG:-"false"}
 export PORT=${PORT:-"5000"}
 
+# Check if .env file exists in parent directory
+if [ -f "../.env" ]; then
+    print_status "Loading environment variables from ../.env"
+    set -a  # automatically export all variables
+    source ../.env
+    set +a  # stop automatically exporting
+    print_success "Environment variables loaded from .env file"
+elif [ -f ".env" ]; then
+    print_status "Loading environment variables from .env"
+    set -a  # automatically export all variables
+    source .env
+    set +a  # stop automatically exporting
+    print_success "Environment variables loaded from .env file"
+else
+    print_warning "No .env file found. Using system environment variables."
+fi
 
+# Check required environment variables
+print_status "Checking required environment variables..."
+
+REQUIRED_VARS=(
+    "AWS_ACCESS_KEY_ID"
+    "AWS_SECRET_ACCESS_KEY"
+    "SUPABASE_URL"
+    "SUPABASE_SERVICE_ROLE_KEY"
+)
+
+MISSING_VARS=()
+
+for var in "${REQUIRED_VARS[@]}"; do
+    if [ -z "${!var}" ]; then
+        MISSING_VARS+=("$var")
+    else
+        print_success "$var: Set"
+    fi
+done
+
+if [ ${#MISSING_VARS[@]} -ne 0 ]; then
+    print_error "Missing required environment variables:"
+    for var in "${MISSING_VARS[@]}"; do
+        print_error "  - $var"
+    done
+    print_error ""
+    print_error "Please set these environment variables:"
+    print_error "  export AWS_ACCESS_KEY_ID=your-access-key"
+    print_error "  export AWS_SECRET_ACCESS_KEY=your-secret-key"
+    print_error "  export SUPABASE_URL=your-supabase-url"
+    print_error "  export SUPABASE_SERVICE_ROLE_KEY=your-supabase-key"
+    print_error "  export AWS_REGION=us-east-1"
+    print_error "  export FLASK_DEBUG=false"
+    print_error "  export PORT=5000"
+    print_error ""
+    print_error "Or create a .env file in the project root with:"
+    print_error "  AWS_ACCESS_KEY_ID=your-access-key"
+    print_error "  AWS_SECRET_ACCESS_KEY=your-secret-key"
+    print_error "  SUPABASE_URL=your-supabase-url"
+    print_error "  SUPABASE_SERVICE_ROLE_KEY=your-supabase-key"
+    print_error "  AWS_REGION=us-east-1"
+    print_error "  FLASK_DEBUG=false"
+    print_error "  PORT=5000"
+    exit 1
+fi
+
+print_success "All required environment variables are set"
+
+# Install dependencies if needed
+print_status "Checking Python dependencies..."
+if python3 -c "import flask, boto3, supabase" 2>/dev/null; then
+    print_success "Required dependencies are installed"
+else
+    print_status "Installing dependencies from requirements.txt..."
+    pip install -r requirements.txt
+    print_success "Dependencies installed"
+fi
+
+# Start the server
+print_status "Starting ChopChop backend server..."
+print_status "Server will be available at: http://localhost:$PORT"
+print_status "Press Ctrl+C to stop the server"
+echo ""
+
+# Start the Flask application
+print_status "Starting nova_backend.py..."
 python3 nova_backend.py
