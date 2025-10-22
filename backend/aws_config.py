@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 AWS Configuration Module for ChopChop Backend
-Handles AWS credentials setup and validation before each run
+Render-safe version: supports lazy initialization and Bedrock (Nova) runtime client.
 """
 
 import os
@@ -10,153 +10,158 @@ import logging
 from botocore.exceptions import ClientError, NoCredentialsError
 from typing import Optional, Dict, Any
 
+# -------------------------------------------------------------------
+# Logging setup
+# -------------------------------------------------------------------
 logger = logging.getLogger(__name__)
+if not logger.handlers:
+    logging.basicConfig(level=logging.INFO)
 
-# Environment variable names
-AWS_REGION_ENV = "AWS_REGION"
-
+# -------------------------------------------------------------------
+# AWS Configuration Class
+# -------------------------------------------------------------------
 class AWSConfig:
-    """AWS Configuration Manager"""
-    
+    """Manages AWS Bedrock Runtime (for Nova models)."""
+
     def __init__(self):
-        self.region = os.getenv(AWS_REGION_ENV, "us-east-1")
-        self.bedrock_client = None
-        self.is_configured = False
-        
-    def validate_credentials(self) -> bool:
-        """Validate AWS credentials are present and accessible"""
+        self.region = os.getenv("AWS_REGION", "us-east-1")
+        self.bedrock_client: Optional[boto3.client] = None
+        self.is_configured: bool = False
+
+    # ---------------------------------------------------------------
+    # Internal helpers
+    # ---------------------------------------------------------------
+    def _has_valid_env(self) -> bool:
+        """Check whether required environment variables exist."""
+        has_id = bool(os.getenv("AWS_ACCESS_KEY_ID"))
+        has_secret = bool(os.getenv("AWS_SECRET_ACCESS_KEY"))
+        if not has_id or not has_secret:
+            logger.warning("⚠️ Missing AWS credentials in environment variables.")
+        return has_id and has_secret
+
+    def _create_runtime_client(self) -> Optional[boto3.client]:
+        """Create and return a Bedrock Runtime client explicitly using env vars."""
         try:
-            # Use default credential chain (includes ~/.aws/credentials and ~/.aws/config)
-            session = boto3.Session()
-            creds = session.get_credentials()
-            
-            if creds is None:
-                logger.error("AWS credentials not found in default chain!")
-                logger.error("Please ensure credentials are configured in one of:")
-                logger.error("  - ~/.aws/credentials file")
-                logger.error("  - ~/.aws/config file")
-                logger.error("  - Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)")
-                logger.error("  - IAM role (for EC2/ECS/Lambda)")
-                logger.error("  - AWS CLI: run 'aws configure' to set up credentials")
-                return False
-                
-            logger.info(f"✅ AWS credentials found from default chain")
-            logger.info(f"Using AWS region: {self.region}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error validating AWS credentials: {e}")
-            return False
-    
-    def setup_bedrock_client(self) -> Optional[boto3.client]:
-        """Setup and return Bedrock client"""
-        try:
-            if not self.validate_credentials():
-                return None
-                
-            logger.info("Initializing AWS Bedrock client...")
-            
-            # Create Bedrock client using default credential chain
-            self.bedrock_client = boto3.client(
+            logger.info(f"🧠 Creating Bedrock Runtime client in region {self.region} ...")
+            client = boto3.client(
                 "bedrock-runtime",
-                region_name=self.region
+                aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+                aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+                region_name=self.region,
             )
-            
-            # Test the client with a simple operation
-            self._test_bedrock_access()
-            
-            logger.info("✅ AWS Bedrock client initialized successfully")
-            self.is_configured = True
-            return self.bedrock_client
-            
+
+            # Verify that the client supports .converse()
+            if not hasattr(client, "converse"):
+                logger.warning(
+                    "⚠️ Your boto3 version may not support .converse(); "
+                    "upgrade to boto3>=1.35.0, botocore>=1.35.0"
+                )
+
+            logger.info("✅ Bedrock Runtime client created successfully.")
+            return client
+
         except NoCredentialsError:
-            logger.error("❌ AWS credentials not found or invalid")
-            logger.error(f"Please set {AWS_ACCESS_KEY_ID_ENV} and {AWS_SECRET_ACCESS_KEY_ENV} environment variables")
+            logger.error("❌ AWS credentials not found or invalid.")
             return None
-            
         except ClientError as e:
             logger.error(f"❌ AWS client error: {e}")
-            logger.error("Please check your AWS credentials and permissions")
             return None
-            
         except Exception as e:
-            logger.error(f"❌ Unexpected error initializing AWS client: {e}")
+            logger.error(f"❌ Unexpected error creating Bedrock client: {e}", exc_info=True)
             return None
-    
-        def _test_bedrock_access(self) -> bool:
-            """
-            Best-effort Bedrock availability check.
-            Uses the control-plane list_foundation_models only if supported.
-            Does NOT fail if unavailable (for BedrockRuntime-only credentials).
-            """
-            try:
-                control = boto3.client("bedrock", region_name=self.region)
-                if hasattr(control, "list_foundation_models"):
-                    control.list_foundation_models()
-                    logger.info("✅ Bedrock control plane reachable")
-                else:
-                    logger.info("ℹ️ Bedrock control client does not support list_foundation_models; skipping test")
-                return True
-            except Exception as e:
-                logger.warning(f"⚠️ Skipping Bedrock control-plane check: {e}")
-                # Don’t fail — runtime will still work
-                return True
 
-    
+    # ---------------------------------------------------------------
+    # Public interface
+    # ---------------------------------------------------------------
+    def setup_bedrock_client(self) -> Optional[boto3.client]:
+        """Initialize and store the Bedrock runtime client."""
+        if not self._has_valid_env():
+            logger.warning("⚠️ AWS credentials not available; skipping initial Bedrock setup.")
+            return None
+
+        client = self._create_runtime_client()
+        if client:
+            self.bedrock_client = client
+            self.is_configured = True
+            return client
+        else:
+            logger.warning("⚠️ Bedrock client setup failed; will retry lazily later.")
+            return None
+
     def get_bedrock_client(self) -> Optional[boto3.client]:
-        """Get Bedrock client (creates if not already initialized)"""
-        if not self.is_configured:
-            return self.setup_bedrock_client()
+        """
+        Return an initialized Bedrock client.
+        Lazily creates one if not yet available.
+        """
+        if self.bedrock_client is not None:
+            return self.bedrock_client
+
+        logger.info("🧠 Bedrock client not initialized — attempting lazy setup...")
+        self.bedrock_client = self._create_runtime_client()
+        if self.bedrock_client:
+            self.is_configured = True
+            logger.info("✅ Lazy Bedrock client initialization successful.")
+        else:
+            logger.error("❌ Lazy Bedrock initialization failed — client still None.")
         return self.bedrock_client
-    
+
     def get_aws_info(self) -> Dict[str, Any]:
-        """Get AWS configuration info for debugging"""
-        client_ready = self.bedrock_client is not None
-        # Keep flags consistent: if client is ready, consider configured
-        self.is_configured = self.is_configured or client_ready
+        """Return diagnostic info (never exposes secrets)."""
         return {
             "region": self.region,
-            # Credential presence is managed by the default chain; do not expose keys
-            "has_access_key": None,
-            "has_secret_key": None,
             "is_configured": self.is_configured,
-            "client_ready": client_ready
+            "client_ready": self.bedrock_client is not None,
+            "env_has_creds": self._has_valid_env(),
         }
-    
+
     def print_config_status(self):
-        """Print AWS configuration status"""
+        """Print configuration status for debugging."""
         info = self.get_aws_info()
         logger.info("🔧 AWS Configuration Status:")
         logger.info(f"  Region: {info['region']}")
-        logger.info("  Credentials: using default AWS credential chain")
+        logger.info(f"  Credentials Present: {'✅ Yes' if info['env_has_creds'] else '❌ No'}")
         logger.info(f"  Configured: {'✅ Yes' if info['is_configured'] else '❌ No'}")
         logger.info(f"  Client Ready: {'✅ Yes' if info['client_ready'] else '❌ No'}")
 
-# Global AWS configuration instance
+# -------------------------------------------------------------------
+# Global access functions
+# -------------------------------------------------------------------
+
 aws_config = AWSConfig()
 
 def get_bedrock_client():
-    """Get configured Bedrock client"""
-    return aws_config.get_bedrock_client()
+    """Return a valid Bedrock runtime client, reinitializing if needed."""
+    try:
+        return aws_config.get_bedrock_client()
+    except Exception as e:
+        logger.error(f"❌ Error in get_bedrock_client(): {e}", exc_info=True)
+        return None
 
-def setup_aws():
-    """Setup AWS configuration (call this at startup)"""
-    logger.info("🚀 Setting up AWS configuration...")
+def setup_aws() -> bool:
+    """Initialize AWS configuration at startup (non-fatal for Render)."""
+    logger.info("🚀 Setting up AWS configuration (non-fatal)...")
     aws_config.print_config_status()
-    
-    client = aws_config.setup_bedrock_client()
-    if client:
-        logger.info("✅ AWS setup completed successfully")
+    try:
+        client = aws_config.setup_bedrock_client()
+        if client:
+            logger.info("✅ AWS setup completed successfully.")
+        else:
+            logger.warning("⚠️ AWS setup incomplete; will retry later when credentials available.")
         return True
-    else:
-        logger.error("❌ AWS setup failed")
-        return False
+    except Exception as e:
+        logger.error(f"⚠️ AWS setup error: {e}", exc_info=True)
+        logger.warning("Continuing without Bedrock until runtime credentials are available.")
+        return True  # Never fail deployment
 
-def check_aws_status():
-    """Check AWS configuration status"""
+def check_aws_status() -> Dict[str, Any]:
+    """Return AWS configuration status for /health endpoint."""
     return aws_config.get_aws_info()
 
+# -------------------------------------------------------------------
+# Standalone test (optional)
+# -------------------------------------------------------------------
 if __name__ == "__main__":
-    # Test the configuration
     logging.basicConfig(level=logging.INFO)
     setup_aws()
+    info = check_aws_status()
+    print("AWS Status:", info)
