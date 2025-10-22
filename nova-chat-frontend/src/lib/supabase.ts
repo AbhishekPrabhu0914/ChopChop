@@ -116,7 +116,8 @@ export class SupabaseService {
 
   static async sendEmail(email: string, items: GroceryItem[], recipes: Recipe[]): Promise<boolean> {
     try {
-      const response = await fetch('/api/send-email', {
+      const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || 'https://chopchop-kqae.onrender.com';
+      const response = await fetch(`${pythonBackendUrl}/send-email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

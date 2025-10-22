@@ -15,6 +15,7 @@ from PIL import Image
 import io
 from dotenv import load_dotenv
 from supabase_config import supabase_manager
+from aws_config import setup_aws, get_bedrock_client, check_aws_status
 import uuid
 import time
 
@@ -28,36 +29,16 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend communication
 
+# Initialize AWS configuration at startup
+logger.info("🚀 Starting ChopChop Backend...")
+aws_setup_success = setup_aws()
+
+if not aws_setup_success:
+    logger.error("❌ AWS setup failed - Bedrock features will be disabled")
+    logger.error("Please check your AWS credentials in environment variables")
+
 # Simple in-memory session store (in production, use Redis or database)
 user_sessions = {}
-
-# Configure AWS SDK
-def get_bedrock_client():
-    """Get configured Bedrock client"""
-    try:
-        # Check if AWS credentials are available
-        aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
-        aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-        aws_region = os.getenv("AWS_REGION", "us-east-1")
-        
-        if not aws_access_key or not aws_secret_key:
-            logger.error("AWS credentials not found. Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.")
-            raise ValueError("AWS credentials not configured")
-        
-        logger.info(f"Initializing Bedrock client with region: {aws_region}")
-        
-        client = boto3.client(
-            "bedrock-runtime", 
-            region_name=aws_region,
-            aws_access_key_id=aws_access_key,
-            aws_secret_access_key=aws_secret_key
-        )
-        
-        logger.info("Bedrock client initialized successfully")
-        return client
-    except Exception as e:
-        logger.error(f"Failed to create Bedrock client: {e}")
-        raise
 
 def create_user_session(email):
     """Create a new user session"""
@@ -346,7 +327,16 @@ def send_message_to_nova(message, image_bytes=None, image_format=None):
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
-    return jsonify({"status": "healthy", "service": "chopchop-backend"})
+    aws_status = check_aws_status()
+    return jsonify({
+        "status": "healthy",
+        "service": "chopchop-backend",
+        "timestamp": time.time(),
+        "supabase_enabled": supabase_manager.enabled,
+        "aws_configured": aws_status["is_configured"],
+        "aws_region": aws_status["region"],
+        "aws_client_ready": aws_status["client_ready"]
+    })
 
 @app.route("/auth/signin", methods=["POST"])
 def signin():

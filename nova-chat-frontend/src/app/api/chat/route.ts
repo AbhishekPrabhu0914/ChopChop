@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Parse backend response with JSON fallback
-    let data: any;
+    let data: { success?: boolean; response?: string; error?: string; message?: string };
     const contentType = response.headers.get('content-type') || '';
     try {
       if (contentType.includes('application/json')) {

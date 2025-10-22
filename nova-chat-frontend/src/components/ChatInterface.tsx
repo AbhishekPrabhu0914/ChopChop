@@ -120,7 +120,8 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
           if (user) {
             try {
               // Load user's saved data
-              const dataResponse = await fetch('/api/get-data', {
+              const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || 'https://chopchop-kqae.onrender.com';
+              const dataResponse = await fetch(`${pythonBackendUrl}/get-data`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -151,7 +152,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
               }
 
               // Load chat history
-              const chatResponse = await fetch('/api/chat-history', {
+              const chatResponse = await fetch(`${pythonBackendUrl}/chat-history`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -200,7 +201,8 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
             // Save the user's actual grocery list
             const itemsToSave = groceryItems;
             
-            await fetch('/api/save-data', {
+            const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || 'https://chopchop-kqae.onrender.com';
+            await fetch(`${pythonBackendUrl}/save-data`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -465,7 +467,8 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
 
         console.log('Sending request to backend with imageBase64 length:', imageBase64.length);
         const user = authService.getCurrentUser();
-        const response = await fetch('/api/chat', {
+        const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || 'https://chopchop-kqae.onrender.com';
+        const response = await fetch(`${pythonBackendUrl}/chat`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

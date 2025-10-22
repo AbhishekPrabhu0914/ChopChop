@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Parse backend response (prefer JSON)
-    let data: any;
+    let data: { success?: boolean; chat_history?: unknown[]; error?: string; message?: string };
     const contentType = response.headers.get('content-type') || '';
     try {
       if (contentType.includes('application/json')) {

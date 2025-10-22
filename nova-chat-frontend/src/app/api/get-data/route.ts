@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Attempt to parse backend response (JSON preferred, fallback to text)
-    let data: any;
+    let data: { success?: boolean; data?: unknown; error?: string; message?: string };
     const contentType = response.headers.get('content-type') || '';
     try {
       if (contentType.includes('application/json')) {

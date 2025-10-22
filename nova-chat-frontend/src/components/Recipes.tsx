@@ -297,7 +297,8 @@ Return the response as a JSON object with this structure:
   }
 }`;
 
-      const response = await fetch('/api/chat', {
+      const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || 'https://chopchop-kqae.onrender.com';
+      const response = await fetch(`${pythonBackendUrl}/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
