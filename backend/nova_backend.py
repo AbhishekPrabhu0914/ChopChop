@@ -35,10 +35,25 @@ user_sessions = {}
 def get_bedrock_client():
     """Get configured Bedrock client"""
     try:
+        # Check if AWS credentials are available
+        aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
+        aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+        aws_region = os.getenv("AWS_REGION", "us-east-1")
+        
+        if not aws_access_key or not aws_secret_key:
+            logger.error("AWS credentials not found. Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.")
+            raise ValueError("AWS credentials not configured")
+        
+        logger.info(f"Initializing Bedrock client with region: {aws_region}")
+        
         client = boto3.client(
             "bedrock-runtime", 
-            region_name=os.getenv("AWS_REGION", "us-east-1")
+            region_name=aws_region,
+            aws_access_key_id=aws_access_key,
+            aws_secret_access_key=aws_secret_key
         )
+        
+        logger.info("Bedrock client initialized successfully")
         return client
     except Exception as e:
         logger.error(f"Failed to create Bedrock client: {e}")
