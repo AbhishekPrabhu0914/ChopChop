@@ -493,9 +493,19 @@ def chat():
                 logger.warning(f"Failed to save chat message: {e}")
                 # Don't fail the request if saving fails
         
+        # Ensure frontend always receives a string to render
+        try:
+            import json as _json
+            if isinstance(response_text, dict):
+                safe_response = _json.dumps(response_text)
+            else:
+                safe_response = str(response_text)
+        except Exception:
+            safe_response = str(response_text)
+
         return jsonify({
             "success": True,
-            "response": response_text
+            "response": safe_response
         })
         
     except Exception as e:
