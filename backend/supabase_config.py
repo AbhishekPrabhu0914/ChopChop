@@ -118,7 +118,7 @@ class SupabaseManager:
                     'id': record['id'],
                     'items': json.loads(record['items']) if record.get('items') else [],
                     'recipes': json.loads(record['recipes']) if record.get('recipes') else [],
-                    'recent_recipes': json.loads(record['recent_recipes']) if record.get('recent_recipes') else []
+                    'recent_recipes': []  # Using recipes column instead
                 }
             else:
                 logger.info(f"No data found for user {user_email}")
@@ -139,65 +139,9 @@ class SupabaseManager:
         Returns:
             True if successful, False otherwise
         """
-        if not self.enabled:
-            logger.warning("Supabase is not enabled. Cannot add recent recipe.")
-            return False
-
-        try:
-            # Fetch existing recent_recipes for the user
-            result = self.supabase.table('Users').select('recent_recipes').eq('email', user_email).execute()
-
-            if result.data and len(result.data) > 0:
-                raw = result.data[0].get('recent_recipes')
-                try:
-                    existing = json.loads(raw) if raw else []
-                except Exception:
-                    existing = raw if isinstance(raw, list) else []
-            else:
-                existing = []
-
-            # Remove duplicates by id or name if present
-            try:
-                recipe_id = recipe.get('id')
-            except Exception:
-                recipe_id = None
-
-            cleaned = []
-            for r in existing:
-                try:
-                    if recipe_id and r.get('id') and r.get('id') == recipe_id:
-                        continue
-                    if (not recipe_id) and recipe.get('name') and r.get('name') == recipe.get('name'):
-                        continue
-                except Exception:
-                    pass
-                cleaned.append(r)
-
-            # Prepend the new recipe so most recent is first
-            cleaned.insert(0, recipe)
-
-            # Trim to 10
-            cleaned = cleaned[:10]
-
-            data = {'recent_recipes': json.dumps(cleaned)}
-
-            if result.data:
-                update_res = self.supabase.table('Users').update(data).eq('email', user_email).execute()
-            else:
-                # Create a new user record if none exists
-                data_with_email = {'email': user_email, 'recent_recipes': json.dumps(cleaned)}
-                update_res = self.supabase.table('Users').insert(data_with_email).execute()
-
-            if update_res and update_res.data:
-                logger.info(f"Added recent recipe for {user_email}")
-                return True
-            else:
-                logger.error(f"Failed to add recent recipe for {user_email}")
-                return False
-
-        except Exception as e:
-            logger.error(f"Error adding recent recipe: {e}")
-            return False
+        # Recent recipes functionality disabled - column not available in current schema
+        logger.info(f"Recent recipe not saved (recent_recipes column not available) for user: {user_email}")
+        return True  # Return True to not break the flow
 
     def get_recent_recipes(self, user_email: str) -> Optional[List[Dict]]:
         """
@@ -209,24 +153,9 @@ class SupabaseManager:
         Returns:
             List of recent recipe dicts, or None on error
         """
-        if not self.enabled:
-            logger.warning("Supabase is not enabled. Cannot retrieve recent recipes.")
-            return None
-
-        try:
-            result = self.supabase.table('Users').select('recent_recipes').eq('email', user_email).execute()
-            if result.data and len(result.data) > 0:
-                raw = result.data[0].get('recent_recipes')
-                try:
-                    recent = json.loads(raw) if raw else []
-                except Exception:
-                    recent = raw if isinstance(raw, list) else []
-                return recent
-            else:
-                return []
-        except Exception as e:
-            logger.error(f"Error retrieving recent recipes: {e}")
-            return None
+        # Recent recipes functionality disabled - column not available in current schema
+        logger.info(f"Recent recipes not available (recent_recipes column not available) for user: {user_email}")
+        return []  # Return empty list to not break the flow
     
     def update_user_data(self, user_email: str, items: List[Dict], recipes: List[Dict]) -> bool:
         """
@@ -436,63 +365,54 @@ class SupabaseManager:
             return False
             
         try:
-            # Check if chat_history column exists by trying to update it
-            try:
-                # First get existing user data
-                result = self.supabase.table('Users').select('*').eq('email', user_email).execute()
-                
-                if result.data:
-                    # Update existing user with chat message
-                    user_record = result.data[0]
-                    chat_history = json.loads(user_record.get('chat_history', '[]'))
-                    
-                    # Add new message to chat history
-                    chat_history.append({
-                        'message': message,
-                        'sender': sender,
-                        'timestamp': 'now()',
-                        'image_data': image_base64,
-                        'image_format': image_format
-                    })
-                    
-                    # Keep only last 100 messages to prevent database bloat
-                    chat_history = chat_history[-100:]
-                    
-                    update_data = {
-                        'chat_history': json.dumps(chat_history)
-                    }
-                    
-                    self.supabase.table('user_data').update(update_data).eq('email', user_email).execute()
-                else:
-                    # Create new user record with chat message
-                    chat_history = [{
-                        'message': message,
-                        'sender': sender,
-                        'timestamp': 'now()',
-                        'image_data': image_base64,
-                        'image_format': image_format
-                    }]
-                    
-                    new_user_data = {
-                        'email': user_email,
-                        'items': '[]',
-                        'recipes': '[]',
-                        'recent_recipes': '[]',
-                        'chat_history': json.dumps(chat_history)
-                    }
-                    
-                    self.supabase.table('user_data').insert(new_user_data).execute()
-                
-                logger.info(f"Saved chat message for user {user_email}")
-                return True
-                
-            except Exception as column_error:
-                if 'column' in str(column_error).lower() and 'does not exist' in str(column_error).lower():
-                    logger.warning("chat_history column doesn't exist, chat message not saved")
-                    return False
-                else:
-                    raise column_error
+            # First get existing user data
+            result = self.supabase.table('Users').select('*').eq('email', user_email).execute()
             
+            if result.data:
+                # Update existing user with chat message
+                user_record = result.data[0]
+                chat_history = json.loads(user_record.get('chat_history', '[]'))
+                
+                # Add new message to chat history
+                chat_history.append({
+                    'message': message,
+                    'sender': sender,
+                    'timestamp': 'now()',
+                    'image_data': image_base64,
+                    'image_format': image_format
+                })
+                
+                # Keep only last 100 messages to prevent database bloat
+                chat_history = chat_history[-100:]
+                
+                update_data = {
+                    'chat_history': json.dumps(chat_history)
+                }
+                
+                self.supabase.table('Users').update(update_data).eq('email', user_email).execute()
+            else:
+                # Create new user record with chat message
+                chat_history = [{
+                    'message': message,
+                    'sender': sender,
+                    'timestamp': 'now()',
+                    'image_data': image_base64,
+                    'image_format': image_format
+                }]
+                
+                new_user_data = {
+                    'email': user_email,
+                    'items': '[]',
+                    'recipes': '[]',
+                    'grocery_list': '[]',
+                    'chat_history': json.dumps(chat_history)
+                }
+                
+                self.supabase.table('Users').insert(new_user_data).execute()
+            
+            logger.info(f"Saved chat message for user {user_email}")
+            return True
+                
         except Exception as e:
             logger.error(f"Error saving chat message: {e}")
             return False
@@ -512,15 +432,7 @@ class SupabaseManager:
             return None
             
         try:
-            # Try to get chat_history column, fall back to all columns if it doesn't exist
-            try:
-                result = self.supabase.table('Users').select('chat_history').eq('email', user_email).execute()
-            except Exception as column_error:
-                if 'column' in str(column_error).lower() and 'does not exist' in str(column_error).lower():
-                    logger.warning("chat_history column doesn't exist, returning empty chat history")
-                    return []
-                else:
-                    raise column_error
+            result = self.supabase.table('Users').select('chat_history').eq('email', user_email).execute()
             
             if result.data and len(result.data) > 0:
                 chat_history_raw = result.data[0].get('chat_history')

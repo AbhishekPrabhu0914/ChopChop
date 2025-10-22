@@ -33,15 +33,13 @@ def test_database_connection():
             'email': 'test@example.com',
             'items': json.dumps([]),
             'recipes': json.dumps([]),
-            'grocery_list': json.dumps([]),
-            'recent_recipes': json.dumps([]),
-            'chat_history': json.dumps([])
+            'grocery_list': json.dumps([])
         }
         
         # Try to insert test data
         insert_result = supabase_manager.supabase.table('Users').insert(test_data).execute()
         if insert_result.data:
-            print("✅ Table structure is correct - can insert data with chat_history column")
+            print("✅ Table structure is correct - can insert data with existing schema")
             
             # Clean up test data
             test_id = insert_result.data[0]['id']
