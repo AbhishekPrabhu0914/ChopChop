@@ -147,6 +147,8 @@ def generate_recipes_from_fridge(message, image_bytes, image_format):
         str: Recipe suggestions based on ingredients
     """
     client = get_bedrock_client()
+    if client is None:
+        raise Exception("Bedrock client not initialized. Check AWS credentials/configuration.")
     model_id = "amazon.nova-pro-v1:0"
     
     # Prepare specialized prompt for fridge analysis with structured output
@@ -277,6 +279,8 @@ def send_message_to_nova(message, image_bytes=None, image_format=None):
         str: Response from the model
     """
     client = get_bedrock_client()
+    if client is None:
+        raise Exception("Bedrock client not initialized. Check AWS credentials/configuration.")
     model_id = "amazon.nova-pro-v1:0"
     
     # Prepare the content

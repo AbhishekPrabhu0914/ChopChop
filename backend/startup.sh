@@ -43,14 +43,13 @@ export PORT=${PORT:-"5000"}
 # Export environment variables explicitly (do not override platform-provided values)
 print_status "Setting up environment variables..."
 
-# AWS Configuration
-export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-""}
-export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-""}
+# AWS Configuration - uses default credential chain (~/.aws/credentials, ~/.aws/config)
 export AWS_REGION=${AWS_REGION:-"us-east-1"}
 
 # Supabase Configuration
 export SUPABASE_URL=${SUPABASE_URL:-""}
 export SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-""}
+export SUPABASE_API_KEY=${SUPABASE_API_KEY:-""}
 
 # Flask Configuration
 export FLASK_DEBUG=${FLASK_DEBUG:-"false"}
@@ -78,8 +77,15 @@ print_status "Checking required environment variables..."
 
 REQUIRED_VARS=(
     "SUPABASE_URL"
-    "SUPABASE_SERVICE_ROLE_KEY"
 )
+
+# Check for Supabase key (either SERVICE_ROLE_KEY or API_KEY)
+SUPABASE_KEY_VAR=""
+if [ -n "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+    SUPABASE_KEY_VAR="SUPABASE_SERVICE_ROLE_KEY"
+elif [ -n "$SUPABASE_API_KEY" ]; then
+    SUPABASE_KEY_VAR="SUPABASE_API_KEY"
+fi
 
 MISSING_VARS=()
 
@@ -91,6 +97,13 @@ for var in "${REQUIRED_VARS[@]}"; do
     fi
 done
 
+# Check Supabase key
+if [ -z "$SUPABASE_KEY_VAR" ]; then
+    MISSING_VARS+=("SUPABASE_SERVICE_ROLE_KEY or SUPABASE_API_KEY")
+else
+    print_success "$SUPABASE_KEY_VAR: Set"
+fi
+
 if [ ${#MISSING_VARS[@]} -ne 0 ]; then
     print_error "Missing required environment variables:"
     for var in "${MISSING_VARS[@]}"; do
@@ -98,17 +111,17 @@ if [ ${#MISSING_VARS[@]} -ne 0 ]; then
     done
     print_error ""
     print_error "Please set these environment variables:"
-    print_error "  export AWS_ACCESS_KEY_ID=your-access-key"
-    print_error "  export AWS_SECRET_ACCESS_KEY=your-secret-key"
     print_error "  export SUPABASE_URL=your-supabase-url"
     print_error "  export SUPABASE_SERVICE_ROLE_KEY=your-supabase-key"
     print_error "  export AWS_REGION=us-east-1"
     print_error "  export FLASK_DEBUG=false"
     print_error "  export PORT=5000"
     print_error ""
+    print_error "For AWS credentials, configure them using AWS CLI:"
+    print_error "  aws configure"
+    print_error "  # This will create ~/.aws/credentials and ~/.aws/config files"
+    print_error ""
     print_error "Or create a .env file in the project root with:"
-    print_error "  AWS_ACCESS_KEY_ID=your-access-key"
-    print_error "  AWS_SECRET_ACCESS_KEY=your-secret-key"
     print_error "  SUPABASE_URL=your-supabase-url"
     print_error "  SUPABASE_SERVICE_ROLE_KEY=your-supabase-key"
     print_error "  AWS_REGION=us-east-1"
@@ -134,6 +147,24 @@ print_status "Starting ChopChop backend server..."
 print_status "Server will be available at: http://localhost:$PORT"
 print_status "Press Ctrl+C to stop the server"
 echo ""
+
+# Test AWS credentials before starting
+print_status "Testing AWS credentials..."
+if python3 -c "from aws_config import setup_aws; result = setup_aws(); print('AWS Setup:', 'SUCCESS' if result else 'FAILED'); exit(0 if result else 1)" 2>/dev/null; then
+    print_success "AWS credentials verified"
+else
+    print_error "AWS credentials test failed!"
+    print_error "Please check your AWS configuration:"
+    print_error "  - AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables"
+    print_error "  - AWS_REGION (should be us-east-1 for Nova Pro)"
+    print_error "  - IAM permissions for Bedrock access"
+    print_error ""
+    print_error "For Render deployment, set these in Render Dashboard > Environment:"
+    print_error "  AWS_ACCESS_KEY_ID=your-access-key"
+    print_error "  AWS_SECRET_ACCESS_KEY=your-secret-key"
+    print_error "  AWS_REGION=us-east-1"
+    exit 1
+fi
 
 # Start the Flask application
 print_status "Starting nova_backend.py..."

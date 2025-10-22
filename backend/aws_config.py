@@ -26,11 +26,21 @@ class AWSConfig:
     def validate_credentials(self) -> bool:
         """Validate AWS credentials are present and accessible"""
         try:
-            # Use default credential chain (Env vars, shared config, EC2/ECS/Render/IAM role, etc.)
+            # Use default credential chain (includes ~/.aws/credentials and ~/.aws/config)
             session = boto3.Session()
             creds = session.get_credentials()
+            
             if creds is None:
-                logger.warning("AWS credentials not immediately available from default chain. Proceeding; client init will verify.")
+                logger.error("AWS credentials not found in default chain!")
+                logger.error("Please ensure credentials are configured in one of:")
+                logger.error("  - ~/.aws/credentials file")
+                logger.error("  - ~/.aws/config file")
+                logger.error("  - Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)")
+                logger.error("  - IAM role (for EC2/ECS/Lambda)")
+                logger.error("  - AWS CLI: run 'aws configure' to set up credentials")
+                return False
+                
+            logger.info(f"✅ AWS credentials found from default chain")
             logger.info(f"Using AWS region: {self.region}")
             return True
             
@@ -74,26 +84,21 @@ class AWSConfig:
             return None
     
     def _test_bedrock_access(self) -> bool:
-        """Test Bedrock access with a simple operation"""
+        """Best-effort Bedrock availability check.
+        Uses Bedrock control plane list_foundation_models if available; otherwise proceeds.
+        """
         try:
-            # Try to list foundation models (this is a read-only operation)
-            response = self.bedrock_client.list_foundation_models()
-            logger.info(f"✅ Bedrock access verified. Found {len(response.get('modelSummaries', []))} models")
+            control = boto3.client("bedrock", region_name=self.region)
+            control.list_foundation_models(MaxResults=1)
+            logger.info("✅ Bedrock control plane reachable")
             return True
-            
         except ClientError as e:
-            error_code = e.response['Error']['Code']
-            if error_code == 'AccessDeniedException':
-                logger.warning("⚠️  Bedrock access limited (AccessDenied) - this may be normal for some regions")
-                logger.info("✅ Bedrock client created successfully (access will be tested on first model call)")
-                return True
-            else:
-                logger.error(f"❌ Bedrock access test failed: {e}")
-                raise e
-                
+            # Lack of permissions to control plane is acceptable; proceed to runtime usage
+            logger.warning(f"⚠️ Bedrock control plane check skipped/denied: {e}")
+            return True
         except Exception as e:
-            logger.error(f"❌ Bedrock access test failed: {e}")
-            raise e
+            logger.warning(f"⚠️ Bedrock control plane check failed: {e}")
+            return True
     
     def get_bedrock_client(self) -> Optional[boto3.client]:
         """Get Bedrock client (creates if not already initialized)"""
@@ -103,13 +108,16 @@ class AWSConfig:
     
     def get_aws_info(self) -> Dict[str, Any]:
         """Get AWS configuration info for debugging"""
+        client_ready = self.bedrock_client is not None
+        # Keep flags consistent: if client is ready, consider configured
+        self.is_configured = self.is_configured or client_ready
         return {
             "region": self.region,
             # Credential presence is managed by the default chain; do not expose keys
             "has_access_key": None,
             "has_secret_key": None,
             "is_configured": self.is_configured,
-            "client_ready": self.bedrock_client is not None
+            "client_ready": client_ready
         }
     
     def print_config_status(self):
