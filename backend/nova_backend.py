@@ -148,8 +148,10 @@ def generate_recipes_from_fridge(message, image_bytes, image_format):
     """
     client = get_bedrock_client()
     if client is None:
+        raise Exception("Bedrock client not initialized")
+    if client is None:
         raise Exception("Bedrock client not initialized. Check AWS credentials/configuration.")
-    model_id = "amazon.nova-pro-v1:0"
+    model_id = "us.amazon.nova-pro-v1:0"
     
     # Prepare specialized prompt for fridge analysis with structured output
     fridge_prompt = """You are a professional chef and food expert. Analyze this fridge photo and return a JSON response with the following structure:
@@ -280,14 +282,27 @@ def send_message_to_nova(message, image_bytes=None, image_format=None):
     """
     client = get_bedrock_client()
     if client is None:
+        raise Exception("Bedrock client not initialized")
+    if client is None:
         raise Exception("Bedrock client not initialized. Check AWS credentials/configuration.")
     model_id = "amazon.nova-pro-v1:0"
     
-    # Prepare the content
-    content = [{"text": message}]
-    
-    # Add image if provided
-    if image_bytes:
+    try:
+        # Text-only path uses invoke_model per Bedrock guidance
+        if not image_bytes:
+            import json as _json
+            payload = _json.dumps({
+                "inputText": message
+            })
+            runtime_response = client.invoke_model(
+                modelId=model_id,
+                body=payload
+            )
+            response_text = runtime_response["body"].read().decode("utf-8")
+            return response_text
+        
+        # If image provided, fall back to converse multimodal
+        content = [{"text": message}]
         content.append({
             "image": {
                 "format": image_format or "jpeg",
@@ -296,28 +311,16 @@ def send_message_to_nova(message, image_bytes=None, image_format=None):
                 }
             }
         })
-    
-    # Prepare the conversation
-    conversation = [
-        {
-            "role": "user",
-            "content": content,
-        }
-    ]
-    
-    try:
-        # Send the message to the model
+        conversation = [{"role": "user", "content": content}]
         response = client.converse(
             modelId=model_id,
             messages=conversation,
             inferenceConfig={
-                "maxTokens": 2048,  # Increased for detailed structured output
-                "temperature": 0.3,  # Lower for more consistent JSON
+                "maxTokens": 2048,
+                "temperature": 0.3,
                 "topP": 0.9
             },
         )
-        
-        # Extract and return the response text
         response_text = response["output"]["message"]["content"][0]["text"]
         return response_text
         
