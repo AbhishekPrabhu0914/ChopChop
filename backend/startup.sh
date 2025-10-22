@@ -40,7 +40,7 @@ export AWS_REGION=${AWS_REGION:-"us-east-1"}
 export FLASK_DEBUG=${FLASK_DEBUG:-"false"}
 export PORT=${PORT:-"5000"}
 
-# Export environment variables explicitly
+# Export environment variables explicitly (do not override platform-provided values)
 print_status "Setting up environment variables..."
 
 # AWS Configuration
@@ -77,8 +77,6 @@ fi
 print_status "Checking required environment variables..."
 
 REQUIRED_VARS=(
-    "AWS_ACCESS_KEY_ID"
-    "AWS_SECRET_ACCESS_KEY"
     "SUPABASE_URL"
     "SUPABASE_SERVICE_ROLE_KEY"
 )

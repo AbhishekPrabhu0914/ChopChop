@@ -14,31 +14,24 @@ logger = logging.getLogger(__name__)
 
 # Environment variable names
 AWS_REGION_ENV = "AWS_REGION"
-AWS_ACCESS_KEY_ID_ENV = "AWS_ACCESS_KEY_ID"
-AWS_SECRET_ACCESS_KEY_ENV = "AWS_SECRET_ACCESS_KEY"
 
 class AWSConfig:
     """AWS Configuration Manager"""
     
     def __init__(self):
         self.region = os.getenv(AWS_REGION_ENV, "us-east-1")
-        self.access_key_id = os.getenv(AWS_ACCESS_KEY_ID_ENV)
-        self.secret_access_key = os.getenv(AWS_SECRET_ACCESS_KEY_ENV)
         self.bedrock_client = None
         self.is_configured = False
         
     def validate_credentials(self) -> bool:
         """Validate AWS credentials are present and accessible"""
         try:
-            if not self.access_key_id or not self.secret_access_key:
-                logger.error("AWS credentials not found!")
-                logger.error("Required environment variables:")
-                logger.error(f"  - {AWS_ACCESS_KEY_ID_ENV}")
-                logger.error(f"  - {AWS_SECRET_ACCESS_KEY_ENV}")
-                logger.error(f"  - {AWS_REGION_ENV} (optional, defaults to us-east-1)")
-                return False
-                
-            logger.info(f"AWS credentials found for region: {self.region}")
+            # Use default credential chain (Env vars, shared config, EC2/ECS/Render/IAM role, etc.)
+            session = boto3.Session()
+            creds = session.get_credentials()
+            if creds is None:
+                logger.warning("AWS credentials not immediately available from default chain. Proceeding; client init will verify.")
+            logger.info(f"Using AWS region: {self.region}")
             return True
             
         except Exception as e:
@@ -53,12 +46,10 @@ class AWSConfig:
                 
             logger.info("Initializing AWS Bedrock client...")
             
-            # Create Bedrock client with explicit credentials
+            # Create Bedrock client using default credential chain
             self.bedrock_client = boto3.client(
                 "bedrock-runtime",
-                region_name=self.region,
-                aws_access_key_id=self.access_key_id,
-                aws_secret_access_key=self.secret_access_key
+                region_name=self.region
             )
             
             # Test the client with a simple operation
@@ -114,8 +105,9 @@ class AWSConfig:
         """Get AWS configuration info for debugging"""
         return {
             "region": self.region,
-            "has_access_key": bool(self.access_key_id),
-            "has_secret_key": bool(self.secret_access_key),
+            # Credential presence is managed by the default chain; do not expose keys
+            "has_access_key": None,
+            "has_secret_key": None,
             "is_configured": self.is_configured,
             "client_ready": self.bedrock_client is not None
         }
@@ -125,8 +117,7 @@ class AWSConfig:
         info = self.get_aws_info()
         logger.info("🔧 AWS Configuration Status:")
         logger.info(f"  Region: {info['region']}")
-        logger.info(f"  Access Key: {'✅ Set' if info['has_access_key'] else '❌ Missing'}")
-        logger.info(f"  Secret Key: {'✅ Set' if info['has_secret_key'] else '❌ Missing'}")
+        logger.info("  Credentials: using default AWS credential chain")
         logger.info(f"  Configured: {'✅ Yes' if info['is_configured'] else '❌ No'}")
         logger.info(f"  Client Ready: {'✅ Yes' if info['client_ready'] else '❌ No'}")
 
