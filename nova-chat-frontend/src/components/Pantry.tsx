@@ -10,33 +10,6 @@ interface PantryProps {
   onUpdate: (updatedItems: PantryItem[]) => void;
 }
 
-const pantryItems: PantryItem[] = [
-  {
-    id: '1',
-    name: 'Tomatoes',
-    quantity: '2 lbs',
-    category: 'vegetables',
-    freshness: 'fresh',
-    detected_at: '2024-01-15T10:00:00Z'
-  },
-  {
-    id: '2',
-    name: 'Milk',
-    quantity: '1 gallon',
-    category: 'dairy',
-    freshness: 'needs_use_soon',
-    detected_at: '2024-01-10T12:30:00Z'
-  },
-  {
-    id: '3',
-    name: 'Chicken Breast',
-    quantity: '3 pieces',
-    category: 'meat',
-    freshness: 'expired',
-    detected_at: '2024-01-05T09:15:00Z'
-  }
-];
-
 export default function Pantry({ initialItems, onUpdate }: PantryProps) {
   const [items, setItems] = useState<PantryItem[]>(initialItems);
   const [newItem, setNewItem] = useState({

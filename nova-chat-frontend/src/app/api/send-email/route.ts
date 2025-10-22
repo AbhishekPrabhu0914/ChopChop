@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, subject, message } = await request.json();
+    const { email, items, recipes } = await request.json();
 
     if (!email) {
       return NextResponse.json(
@@ -12,15 +12,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Forward the request to the Python backend
-    const response = await fetch('http://localhost:8000/send-email', {
+    const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || 'https://chopchop-kqae.onrender.com';
+    const response = await fetch(`${pythonBackendUrl}/send-email`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         email,
-        subject,
-        message
+        items,
+        recipes
       }),
     });
 

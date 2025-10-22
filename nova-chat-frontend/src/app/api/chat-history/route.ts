@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
     const { email } = body;
 
     // Call the Python backend
-    const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || 'http://localhost:8000';
+    const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || 'https://chopchop-kqae.onrender.com';
     
     const response = await fetch(`${pythonBackendUrl}/chat-history`, {
       method: 'POST',

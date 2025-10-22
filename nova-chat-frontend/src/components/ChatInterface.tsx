@@ -46,11 +46,27 @@ interface Recipe {
   tips: string;
 }
 
+interface StructuredResponse {
+  type: 'structured';
+  data: {
+    grocery_list?: GroceryItem[];
+    recipes?: Recipe[];
+    ingredients?: PantryItem[];
+  };
+}
+
+interface ApiResponse {
+  success: boolean;
+  response: string | StructuredResponse;
+  error?: string;
+}
+
 export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isFridgeMode, setIsFridgeMode] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [activeTab, setActiveTab] = useState<'chat' | 'grocery' | 'recipes' | 'pantry'>('chat');
   const [groceryItems, setGroceryItems] = useState<GroceryItem[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -209,17 +225,111 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
 
 
 
-  const compressImage = async (file: File, maxSizeMB: number = 3): Promise<File> => {
+  const handleStructuredResponse = (response: string) => {
+    try {
+      // Try to parse as JSON to check if it's structured data
+      const parsedResponse = JSON.parse(response);
+      if (parsedResponse && typeof parsedResponse === 'object' && parsedResponse.type === 'structured') {
+        const structuredData = parsedResponse.data;
+        
+        // Update grocery list, recipes, and pantry
+        if (structuredData.grocery_list) {
+          setGroceryItems(structuredData.grocery_list);
+        }
+        if (structuredData.recipes) {
+          setRecipes(prevRecipes => {
+            // Merge new recipes with existing ones, avoiding duplicates based on name
+            const existingNames = prevRecipes.map(recipe => recipe.name.toLowerCase());
+            const newRecipes = structuredData.recipes.filter((recipe: Recipe) => 
+              !existingNames.includes(recipe.name.toLowerCase())
+            );
+            return [...prevRecipes, ...newRecipes];
+          });
+        }
+        if (structuredData.ingredients) {
+          setPantryItems(structuredData.ingredients);
+        }
+      }
+    } catch {
+      // If parsing fails, it's just a text response, which is fine
+      console.log('Response is not structured data, treating as text');
+    }
+  };
+
+  const uploadImageInChunks = async (file: File): Promise<string> => {
+    console.log(`Processing large file: ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)}MB)`);
+    
+    // For very large files, compress them more aggressively first
+    setUploadProgress(25);
+    const compressedFile = await compressImage(file, 3.5); // More aggressive compression for large files
+    
+    const compressedSizeMB = (compressedFile.size / (1024 * 1024)).toFixed(1);
+    console.log(`Compressed large file to: ${compressedSizeMB}MB`);
+    
+    setUploadProgress(50);
+    
+    // Convert compressed file to base64
+    const imageBase64 = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        resolve(result.split(',')[1]);
+      };
+      reader.readAsDataURL(compressedFile);
+    });
+    
+    console.log(`Base64 length: ${imageBase64.length} characters (${(imageBase64.length * 0.75 / 1024 / 1024).toFixed(1)}MB)`);
+    
+    setUploadProgress(75);
+    
+    // Send to Python backend
+    const user = authService.getCurrentUser();
+    const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || 'https://chopchop-kqae.onrender.com';
+    
+    console.log(`Sending to backend: ${pythonBackendUrl}/chat`);
+    
+    const response = await fetch(`${pythonBackendUrl}/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message: "Analyze this fridge photo and suggest recipes based on the ingredients you can see. List the ingredients first, then provide 2-3 recipe suggestions with cooking instructions.",
+        imageBase64: imageBase64,
+        imageFormat: 'jpeg',
+        email: user?.email
+      }),
+    });
+
+    console.log(`Backend response status: ${response.status}`);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Backend error response: ${errorText}`);
+      throw new Error(`Backend upload failed with status: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Backend processing failed');
+    }
+    
+    setUploadProgress(100); // Complete
+    return data.response;
+  };
+
+  const compressImage = async (file: File, maxSizeMB: number = 8): Promise<File> => {
     return new Promise((resolve) => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      const img = new Image();
+      const img = document.createElement('img') as HTMLImageElement;
       
       img.onload = () => {
         // Calculate new dimensions to fit within maxSizeMB
         let { width, height } = img;
-        const maxDimension = 1024; // Max width/height
-        const quality = 0.8;
+        const maxDimension = 2048; // Increased max width/height for better quality
+        const maxBytes = maxSizeMB * 1024 * 1024;
         
         // Resize if too large
         if (width > maxDimension || height > maxDimension) {
@@ -235,20 +345,37 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
         canvas.width = width;
         canvas.height = height;
         
-        // Draw and compress
+        // Draw and compress with progressive quality reduction
         ctx?.drawImage(img, 0, 0, width, height);
         
-        canvas.toBlob((blob) => {
-          if (blob) {
-            const compressedFile = new File([blob], file.name, {
-              type: 'image/jpeg',
-              lastModified: Date.now()
-            });
+        const compressWithQuality = (quality: number): Promise<File | null> => {
+          return new Promise((resolveQuality) => {
+            canvas.toBlob((blob) => {
+              if (blob && blob.size <= maxBytes) {
+                const compressedFile = new File([blob], file.name, {
+                  type: 'image/jpeg',
+                  lastModified: Date.now()
+                });
+                resolveQuality(compressedFile);
+              } else if (blob && quality > 0.1) {
+                // Try with lower quality
+                compressWithQuality(quality - 0.1).then(resolveQuality);
+              } else {
+                resolveQuality(null);
+              }
+            }, 'image/jpeg', quality);
+          });
+        };
+        
+        // Start with high quality and reduce if needed
+        compressWithQuality(0.9).then((compressedFile) => {
+          if (compressedFile) {
             resolve(compressedFile);
           } else {
-            resolve(file); // Fallback to original
+            // Fallback to original if compression fails
+            resolve(file);
           }
-        }, 'image/jpeg', quality);
+        });
       };
       
       img.src = URL.createObjectURL(file);
@@ -258,9 +385,9 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
   const uploadFridgePhoto = async (file: File) => {
     console.log('Starting fridge photo upload:', file.name, file.type, file.size);
     
-    // Check file size (limit to 4MB for Vercel compatibility)
-    if (file.size > 4 * 1024 * 1024) {
-      alert('Image too large. Maximum supported size is 4MB. Please compress or resize your image.');
+    // Check file size (limit to 40MB before compression)
+    if (file.size > 40 * 1024 * 1024) {
+      alert('Image too large. Maximum supported size is 40MB. Please compress or resize your image.');
       return;
     }
     
@@ -272,6 +399,10 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
     }
     
     setIsFridgeMode(true);
+    
+    // Show compression progress
+    const originalSizeMB = (file.size / (1024 * 1024)).toFixed(1);
+    console.log(`Original image size: ${originalSizeMB}MB`);
     
     // Create image preview for user message
     const imagePreviewUrl = await new Promise<string>((resolve) => {
@@ -296,38 +427,63 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
     setIsLoading(true);
 
     try {
-      // Compress image if it's too large
-      const compressedFile = await compressImage(file);
+      let data: ApiResponse;
       
-      const imageBase64 = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          resolve(result.split(',')[1]);
+      // For files larger than 5MB, use aggressive compression
+      if (file.size > 5 * 1024 * 1024) {
+        console.log('Using aggressive compression for large file...');
+        const chunkedResponse = await uploadImageInChunks(file);
+        
+        // Add Nova's response to messages
+        const novaMessage: Message = {
+          id: Date.now().toString(),
+          text: chunkedResponse,
+          sender: 'nova',
+          timestamp: new Date()
         };
-        reader.readAsDataURL(compressedFile);
-      });
+        setMessages(prev => [...prev, novaMessage]);
+        
+        // Extract and handle structured responses
+        handleStructuredResponse(chunkedResponse);
+        return; // Exit early for chunked uploads
+      } else {
+        // For smaller files, compress normally
+        console.log('Compressing image...');
+        const compressedFile = await compressImage(file, 4.2); // 4.2MB to be safe
+        
+        const compressedSizeMB = (compressedFile.size / (1024 * 1024)).toFixed(1);
+        console.log(`Compressed image size: ${compressedSizeMB}MB`);
+        
+        const imageBase64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            resolve(result.split(',')[1]);
+          };
+          reader.readAsDataURL(compressedFile);
+        });
 
-      console.log('Sending request to backend with imageBase64 length:', imageBase64.length);
-      const user = authService.getCurrentUser();
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: "Analyze this fridge photo and suggest recipes based on the ingredients you can see. List the ingredients first, then provide 2-3 recipe suggestions with cooking instructions.",
-          imageBase64,
-          imageFormat: file.type.split('/')[1],
-          email: user?.email
-        }),
-      });
+        console.log('Sending request to backend with imageBase64 length:', imageBase64.length);
+        const user = authService.getCurrentUser();
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: "Analyze this fridge photo and suggest recipes based on the ingredients you can see. List the ingredients first, then provide 2-3 recipe suggestions with cooking instructions.",
+            imageBase64,
+            imageFormat: file.type.split('/')[1],
+            email: user?.email
+          }),
+        });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        data = await response.json();
       }
-
-      const data = await response.json();
 
       if (data.success) {
         // Check if response is structured data
@@ -342,7 +498,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
             setRecipes(prevRecipes => {
               // Merge new recipes with existing ones, avoiding duplicates based on name
               const existingNames = prevRecipes.map(recipe => recipe.name.toLowerCase());
-              const newRecipes = structuredData.recipes.filter((recipe: Recipe) => 
+              const newRecipes = structuredData.recipes!.filter((recipe: Recipe) => 
                 !existingNames.includes(recipe.name.toLowerCase())
               );
               return [...prevRecipes, ...newRecipes];
@@ -351,10 +507,11 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
           if (structuredData.ingredients) {
             // Convert detected ingredients to pantry items
             const pantryItemsFromIngredients: PantryItem[] = structuredData.ingredients.map((ingredient: {name: string, quantity: string, category: string}) => ({
+              id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
               name: ingredient.name || 'Unknown ingredient',
               quantity: ingredient.quantity || 'Unknown quantity',
               category: ingredient.category || 'other',
-              freshness: 'good',
+              freshness: 'fresh',
               detected_at: new Date().toISOString()
             }));
             setPantryItems(prev => {
@@ -563,12 +720,36 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
         
         {isLoading && (
           <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-            <div style={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '0.5rem', padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '0.5rem', padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: '300px' }}>
               <div style={{ fontSize: '1.25rem' }}>🤖</div>
               <div style={{ width: '1rem', height: '1rem', border: '2px solid #6b7280', borderTop: '2px solid transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-              <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                {isFridgeMode ? 'Analyzing your fridge and generating recipes...' : 'Analyzing your image...'}
-              </span>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: '0.875rem', color: '#6b7280', display: 'block' }}>
+                  {isFridgeMode ? 'Analyzing your fridge and generating recipes...' : 'Analyzing your image...'}
+                </span>
+                {uploadProgress > 0 && (
+                  <div style={{ marginTop: '0.25rem' }}>
+                    <div style={{ 
+                      width: '100%', 
+                      height: '4px', 
+                      backgroundColor: '#e5e7eb', 
+                      borderRadius: '2px',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{ 
+                        width: `${uploadProgress}%`, 
+                        height: '100%', 
+                        backgroundColor: '#3b82f6', 
+                        transition: 'width 0.3s ease',
+                        borderRadius: '2px'
+                      }}></div>
+                    </div>
+                    <span style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.125rem', display: 'block' }}>
+                      Upload Progress: {uploadProgress.toFixed(0)}%
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}

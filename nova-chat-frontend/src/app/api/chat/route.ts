@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Configure for larger request bodies
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '4.5mb',
+    },
+  },
+};
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -13,7 +22,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Call the Python backend
-    const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || 'http://localhost:8000';
+    const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || 'https://chopchop-kqae.onrender.com';
     
     const response = await fetch(`${pythonBackendUrl}/chat`, {
       method: 'POST',

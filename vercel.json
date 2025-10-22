@@ -1,21 +1,12 @@
 {
   "version": 2,
+  "name": "chopchop",
   "builds": [
     {
       "src": "nova-chat-frontend/package.json",
       "use": "@vercel/next"
     }
   ],
-  "functions": {
-    "nova-chat-frontend/src/app/api/upload-fridge/route.ts": {
-      "memory": 1536,
-      "maxDuration": 60
-    },
-    "nova-chat-frontend/src/app/api/chat/route.ts": {
-      "memory": 1536,
-      "maxDuration": 60
-    }
-  },
   "routes": [
     {
       "src": "\\/(.*)",
@@ -26,5 +17,10 @@
     "NEXT_PUBLIC_SUPABASE_URL": "https://afvyuqrmqspoyudubswb.supabase.co",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmdnl1cXJtcXNwb3l1ZHVic3diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA3NDM2MDIsImV4cCI6MjA3NjMxOTYwMn0.v4XNngB5B-XxEIJRKH9ujKpSUPix1hbmQt3kNQGRhqM",
     "PYTHON_BACKEND_URL": "https://chopchop-kqae.onrender.com"
+  },
+  "functions": {
+    "nova-chat-frontend/src/app/api/**/*.ts": {
+      "maxDuration": 30
+    }
   }
 }
