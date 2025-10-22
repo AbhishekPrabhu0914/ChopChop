@@ -67,7 +67,7 @@ class SupabaseManager:
             
         try:
             # First check if user exists
-            existing_result = self.supabase.table('user_data').select('id').eq('email', user_email).execute()
+            existing_result = self.supabase.table('Users').select('id').eq('email', user_email).execute()
             
             data = {
                 'email': user_email,
@@ -77,11 +77,11 @@ class SupabaseManager:
             
             if existing_result.data:
                 # Update existing user
-                result = self.supabase.table('user_data').update(data).eq('email', user_email).execute()
+                result = self.supabase.table('Users').update(data).eq('email', user_email).execute()
                 record_id = existing_result.data[0]['id']
             else:
                 # Insert new user
-                result = self.supabase.table('user_data').insert(data).execute()
+                result = self.supabase.table('Users').insert(data).execute()
                 record_id = result.data[0]['id']
             
             if result.data:
@@ -110,7 +110,7 @@ class SupabaseManager:
             return None
             
         try:
-            result = self.supabase.table('user_data').select('*').eq('email', user_email).execute()
+            result = self.supabase.table('Users').select('*').eq('email', user_email).execute()
             
             if result.data:
                 record = result.data[0]
@@ -145,7 +145,7 @@ class SupabaseManager:
 
         try:
             # Fetch existing recent_recipes for the user
-            result = self.supabase.table('user_data').select('recent_recipes').eq('email', user_email).execute()
+            result = self.supabase.table('Users').select('recent_recipes').eq('email', user_email).execute()
 
             if result.data and len(result.data) > 0:
                 raw = result.data[0].get('recent_recipes')
@@ -182,11 +182,11 @@ class SupabaseManager:
             data = {'recent_recipes': json.dumps(cleaned)}
 
             if result.data:
-                update_res = self.supabase.table('user_data').update(data).eq('email', user_email).execute()
+                update_res = self.supabase.table('Users').update(data).eq('email', user_email).execute()
             else:
                 # Create a new user record if none exists
                 data_with_email = {'email': user_email, 'recent_recipes': json.dumps(cleaned)}
-                update_res = self.supabase.table('user_data').insert(data_with_email).execute()
+                update_res = self.supabase.table('Users').insert(data_with_email).execute()
 
             if update_res and update_res.data:
                 logger.info(f"Added recent recipe for {user_email}")
@@ -214,7 +214,7 @@ class SupabaseManager:
             return None
 
         try:
-            result = self.supabase.table('user_data').select('recent_recipes').eq('email', user_email).execute()
+            result = self.supabase.table('Users').select('recent_recipes').eq('email', user_email).execute()
             if result.data and len(result.data) > 0:
                 raw = result.data[0].get('recent_recipes')
                 try:
@@ -250,7 +250,7 @@ class SupabaseManager:
                 'recipes': json.dumps(recipes)
             }
             
-            result = self.supabase.table('user_data').update(data).eq('email', user_email).execute()
+            result = self.supabase.table('Users').update(data).eq('email', user_email).execute()
             
             if result.data:
                 logger.info(f"Successfully updated data for user {user_email}")
@@ -439,7 +439,7 @@ class SupabaseManager:
             # Check if chat_history column exists by trying to update it
             try:
                 # First get existing user data
-                result = self.supabase.table('user_data').select('*').eq('email', user_email).execute()
+                result = self.supabase.table('Users').select('*').eq('email', user_email).execute()
                 
                 if result.data:
                     # Update existing user with chat message
@@ -514,7 +514,7 @@ class SupabaseManager:
         try:
             # Try to get chat_history column, fall back to all columns if it doesn't exist
             try:
-                result = self.supabase.table('user_data').select('chat_history').eq('email', user_email).execute()
+                result = self.supabase.table('Users').select('chat_history').eq('email', user_email).execute()
             except Exception as column_error:
                 if 'column' in str(column_error).lower() and 'does not exist' in str(column_error).lower():
                     logger.warning("chat_history column doesn't exist, returning empty chat history")
