@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ChopChop Backend Startup Script
-# This script sets up the environment and starts the backend server
+# This script loads environment variables and starts the backend server
 
 set -e  # Exit on any error
 
@@ -47,7 +47,7 @@ fi
 
 print_status "Python version: $(python3 --version)"
 
-# Check if virtual environment exists
+# Check if virtual environment exists and activate it
 if [ -d "../venv" ]; then
     print_status "Activating virtual environment..."
     source ../venv/bin/activate
@@ -56,90 +56,29 @@ else
     print_warning "No virtual environment found. Using system Python."
 fi
 
-# Check if requirements are installed
-print_status "Checking Python dependencies..."
-if python3 -c "import flask, boto3, supabase" 2>/dev/null; then
-    print_success "Required dependencies are installed"
-else
-    print_status "Installing dependencies from requirements.txt..."
-    pip install -r requirements.txt
-    print_success "Dependencies installed"
-fi
+# Load environment variables
+print_status "Loading environment variables..."
 
-# Check environment variables
-print_status "Checking environment variables..."
+# Set default values
+export AWS_REGION=${AWS_REGION:-"us-east-1"}
+export FLASK_DEBUG=${FLASK_DEBUG:-"false"}
+export PORT=${PORT:-"5000"}
 
-# Required environment variables
-REQUIRED_VARS=(
-    "AWS_ACCESS_KEY_ID"
-    "AWS_SECRET_ACCESS_KEY"
-    "SUPABASE_URL"
-    "SUPABASE_SERVICE_ROLE_KEY"
-)
+# Export environment variables explicitly
+print_status "Setting up environment variables..."
 
-# Optional environment variables with defaults
-AWS_REGION=${AWS_REGION:-"us-east-1"}
-FLASK_DEBUG=${FLASK_DEBUG:-"false"}
-PORT=${PORT:-"5000"}
+# AWS Configuration
+export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-""}
+export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-""}
+export AWS_REGION=${AWS_REGION:-"us-east-1"}
 
-MISSING_VARS=()
+# Supabase Configuration
+export SUPABASE_URL=${SUPABASE_URL:-""}
+export SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-""}
 
-for var in "${REQUIRED_VARS[@]}"; do
-    if [ -z "${!var}" ]; then
-        MISSING_VARS+=("$var")
-    else
-        print_success "$var: Set"
-    fi
-done
+# Flask Configuration
+export FLASK_DEBUG=${FLASK_DEBUG:-"false"}
+export PORT=${PORT:-"5000"}
 
-if [ ${#MISSING_VARS[@]} -ne 0 ]; then
-    print_error "Missing required environment variables:"
-    for var in "${MISSING_VARS[@]}"; do
-        print_error "  - $var"
-    done
-    print_error ""
-    print_error "Please set these environment variables:"
-    print_error "  export AWS_ACCESS_KEY_ID='your-access-key'"
-    print_error "  export AWS_SECRET_ACCESS_KEY='your-secret-key'"
-    print_error "  export SUPABASE_URL='your-supabase-url'"
-    print_error "  export SUPABASE_SERVICE_ROLE_KEY='your-supabase-key'"
-    print_error ""
-    print_error "Optional variables:"
-    print_error "  export AWS_REGION='us-east-1'  # Default: us-east-1"
-    print_error "  export FLASK_DEBUG='false'     # Default: false"
-    print_error "  export PORT='5000'             # Default: 5000"
-    exit 1
-fi
 
-print_success "All required environment variables are set"
-
-# Run startup check
-print_status "Running startup checks..."
-if python3 startup_check.py; then
-    print_success "Startup checks passed"
-else
-    print_error "Startup checks failed"
-    exit 1
-fi
-
-# Start the server
-print_status "Starting ChopChop backend server..."
-print_status "Server will be available at: http://localhost:$PORT"
-print_status "Press Ctrl+C to stop the server"
-echo ""
-
-# Start the Flask application
-if [ "$FLASK_DEBUG" = "true" ]; then
-    print_status "Starting in DEBUG mode..."
-    python3 nova_backend.py
-else
-    print_status "Starting in PRODUCTION mode..."
-    # Use gunicorn for production
-    if command -v gunicorn &> /dev/null; then
-        gunicorn -w 2 -k gthread -b 0.0.0.0:$PORT nova_backend:app
-    else
-        print_warning "Gunicorn not found, installing..."
-        pip install gunicorn
-        gunicorn -w 2 -k gthread -b 0.0.0.0:$PORT nova_backend:app
-    fi
-fi
+python3 nova_backend.py
