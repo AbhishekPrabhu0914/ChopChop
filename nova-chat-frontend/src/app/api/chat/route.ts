@@ -28,16 +28,26 @@ export async function POST(request: NextRequest) {
       }),
     });
 
-    if (!response.ok) {
-      throw new Error(`Python backend responded with status: ${response.status}`);
+    // Parse backend response with JSON fallback
+    let data: any;
+    const contentType = response.headers.get('content-type') || '';
+    try {
+      if (contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        data = { message: text };
+      }
+    } catch (parseErr) {
+      console.error('Failed to parse Python backend response for chat:', parseErr);
+      data = { error: 'Failed to parse backend response' };
     }
 
-    const data = await response.json();
-    
-    return NextResponse.json({
-      success: true,
-      response: data.response
-    });
+    if (!response.ok) {
+      return NextResponse.json(data, { status: response.status });
+    }
+
+    return NextResponse.json(data);
 
   } catch (error: unknown) {
     console.error('Error calling Python backend:', error);

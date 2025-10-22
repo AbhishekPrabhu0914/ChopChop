@@ -18,16 +18,27 @@ export async function POST(request: NextRequest) {
       }),
     });
 
-    if (!response.ok) {
-      throw new Error(`Python backend responded with status: ${response.status}`);
+    // Attempt to parse backend response (JSON preferred, fallback to text)
+    let data: any;
+    const contentType = response.headers.get('content-type') || '';
+    try {
+      if (contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        data = { message: text };
+      }
+    } catch (parseErr) {
+      console.error('Failed to parse Python backend response for get-data:', parseErr);
+      data = { error: 'Failed to parse backend response' };
     }
 
-    const data = await response.json();
-    
-    return NextResponse.json({
-      success: data.success,
-      data: data.data
-    });
+    // If backend returned an error status, forward it and the body to the client
+    if (!response.ok) {
+      return NextResponse.json(data, { status: response.status });
+    }
+
+    return NextResponse.json(data);
 
   } catch (error: unknown) {
     console.error('Error calling Python backend for get-data:', error);

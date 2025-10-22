@@ -488,10 +488,18 @@ def chat():
         
     except Exception as e:
         logger.error(f"Error in chat endpoint: {e}")
-        return jsonify({
-            "error": "Failed to get response from Nova model",
-            "details": str(e)
-        }), 500
+        err_str = str(e)
+        # If AWS credentials are missing, return 503 to indicate service/config issue
+        if 'Unable to locate credentials' in err_str or 'AWS Client Error' in err_str:
+            return jsonify({
+                "error": "AWS credentials/configuration error",
+                "details": err_str
+            }), 503
+        else:
+            return jsonify({
+                "error": "Failed to get response from Nova model",
+                "details": err_str
+            }), 500
 
 @app.route('/recent-recipes/add', methods=['POST'])
 def add_recent_recipe():
