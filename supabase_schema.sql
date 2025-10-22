@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS user_data (
     email VARCHAR(255) NOT NULL UNIQUE,
     items JSONB NOT NULL DEFAULT '[]'::jsonb,
     recipes JSONB NOT NULL DEFAULT '[]'::jsonb,
+    chat_history JSONB NOT NULL DEFAULT '[]'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -58,10 +59,12 @@ SELECT
     email,
     items,
     recipes,
+    chat_history,
     created_at,
     updated_at,
     jsonb_array_length(items) as item_count,
-    jsonb_array_length(recipes) as recipe_count
+    jsonb_array_length(recipes) as recipe_count,
+    jsonb_array_length(chat_history) as chat_count
 FROM user_data;
 
 -- Grant access to the view

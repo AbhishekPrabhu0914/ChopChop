@@ -285,20 +285,22 @@ def send_message_to_nova(message, image_bytes=None, image_format=None):
         raise Exception("Bedrock client not initialized")
     if client is None:
         raise Exception("Bedrock client not initialized. Check AWS credentials/configuration.")
-    model_id = "amazon.nova-pro-v1:0"
+    model_id = "us.amazon.nova-pro-v1:0"
     
     try:
-        # Text-only path uses invoke_model per Bedrock guidance
+        # Text-only path uses converse API (not invoke_model)
         if not image_bytes:
-            import json as _json
-            payload = _json.dumps({
-                "inputText": message
-            })
-            runtime_response = client.invoke_model(
+            conversation = [{"role": "user", "content": [{"text": message}]}]
+            response = client.converse(
                 modelId=model_id,
-                body=payload
+                messages=conversation,
+                inferenceConfig={
+                    "maxTokens": 2048,
+                    "temperature": 0.7,
+                    "topP": 0.9
+                }
             )
-            response_text = runtime_response["body"].read().decode("utf-8")
+            response_text = response["output"]["message"]["content"][0]["text"]
             return response_text
         
         # If image provided, fall back to converse multimodal

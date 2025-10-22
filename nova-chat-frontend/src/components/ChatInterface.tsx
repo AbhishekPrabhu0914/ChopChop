@@ -227,8 +227,24 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
 
 
 
-  const handleStructuredResponse = (response: string) => {
+  const handleStructuredResponse = (response: string, userMessage?: string) => {
     try {
+      // Only parse structured responses for pantry/fridge-related messages
+      const isPantryRelated = userMessage && (
+        userMessage.toLowerCase().includes('pantry') ||
+        userMessage.toLowerCase().includes('fridge') ||
+        userMessage.toLowerCase().includes('ingredient') ||
+        userMessage.toLowerCase().includes('recipe') ||
+        userMessage.toLowerCase().includes('analyze') ||
+        userMessage.toLowerCase().includes('checkout') ||
+        userMessage.toLowerCase().includes('check out')
+      );
+      
+      if (!isPantryRelated) {
+        console.log('Response not pantry-related, treating as text');
+        return;
+      }
+      
       // Try to parse as JSON to check if it's structured data
       const parsedResponse = JSON.parse(response);
       if (parsedResponse && typeof parsedResponse === 'object' && parsedResponse.type === 'structured') {
@@ -446,7 +462,7 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
         setMessages(prev => [...prev, novaMessage]);
         
         // Extract and handle structured responses
-        handleStructuredResponse(chunkedResponse);
+        handleStructuredResponse(chunkedResponse, "Analyze this fridge photo and suggest recipes based on the ingredients you can see. List the ingredients first, then provide 2-3 recipe suggestions with cooking instructions.");
         return; // Exit early for chunked uploads
       } else {
         // For smaller files, compress normally
@@ -489,8 +505,18 @@ export default function ChatInterface({ onSignOut }: ChatInterfaceProps) {
       }
 
       if (data.success) {
-        // Check if response is structured data
-        if (data.response && typeof data.response === 'object' && data.response.type === 'structured') {
+        // Check if response is structured data and message is pantry-related
+        const isPantryRelated = message && (
+          message.toLowerCase().includes('pantry') ||
+          message.toLowerCase().includes('fridge') ||
+          message.toLowerCase().includes('ingredient') ||
+          message.toLowerCase().includes('recipe') ||
+          message.toLowerCase().includes('analyze') ||
+          message.toLowerCase().includes('checkout') ||
+          message.toLowerCase().includes('check out')
+        );
+        
+        if (data.response && typeof data.response === 'object' && data.response.type === 'structured' && isPantryRelated) {
           const structuredData = data.response.data;
           
           // Update grocery list, recipes, and pantry
