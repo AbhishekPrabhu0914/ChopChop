@@ -89,7 +89,8 @@ class AWSConfig:
         """
         try:
             control = boto3.client("bedrock", region_name=self.region)
-            control.list_foundation_models(MaxResults=1)
+            # Call without optional params for maximum compatibility across SDK versions
+            control.list_foundation_models()
             logger.info("✅ Bedrock control plane reachable")
             return True
         except ClientError as e:

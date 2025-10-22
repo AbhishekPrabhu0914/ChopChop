@@ -4,7 +4,7 @@ services:
     runtime: python
     rootDir: backend
     buildCommand: pip install --no-cache-dir -r requirements.txt
-    startCommand: python startup_check.py && gunicorn -w 2 -k gthread -b 0.0.0.0:$PORT nova_backend:app
+    startCommand: gunicorn -w 2 -k gthread -b 0.0.0.0:$PORT nova_backend:app
     envVars:
       - key: SUPABASE_URL
         sync: false
